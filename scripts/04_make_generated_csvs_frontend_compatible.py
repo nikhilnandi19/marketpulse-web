@@ -160,6 +160,16 @@ def make_company_compatible(company: pd.DataFrame, future: pd.DataFrame, backtes
 
     f30 = f30.rename(columns=rename_f30)
 
+    # Drop columns that are about to be re-added from the fresh Day-30 forecast.
+    # This prevents pandas merge suffix conflicts when the script is rerun.
+    duplicate_merge_cols = [
+        col for col in f30.columns
+        if col != "symbol" and col in company.columns
+    ]
+
+    if duplicate_merge_cols:
+        company = company.drop(columns=duplicate_merge_cols)
+
     company = company.merge(f30, on="symbol", how="left")
 
     if "latest_close_live" in company.columns:

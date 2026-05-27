@@ -26,3 +26,25 @@ yarn-error.log*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Python virtual environment
+.venv/
+
+# MarketPulse live data pipeline local outputs
+data/live/sp500_prices_live.csv
+data/live/generated/
+backups/
+
+# System files
+.DS_Store
+
+# Python virtual environment
+.venv/
+
+# MarketPulse live data pipeline local outputs
+data/live/sp500_prices_live.csv
+data/live/generated/
+backups/
+
+# System files
+.DS_Store
