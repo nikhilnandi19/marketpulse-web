@@ -565,7 +565,7 @@ export default function Home() {
 
       {/* ── Dashboard ──────────────────────────────────────────────────── */}
       {!showHero && (
-        <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 pb-16" style={{ paddingTop: 32 }}>
+        <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 pb-16" style={{ paddingTop: activeTab === 'explorer' ? 0 : 32 }}>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4">
               <div className="w-7 h-7 rounded-full border-2 border-transparent animate-spin"

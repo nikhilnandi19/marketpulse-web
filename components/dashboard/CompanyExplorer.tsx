@@ -37,7 +37,7 @@ const D = {
 }
 
 const signalShortLabel: Record<string, string> = {
-  'Potential Opportunity':                    'AI OPPORT.',
+  'Potential Opportunity':                    'OPPORTUNITY',
   'Stable Watchlist':                         'STABLE',
   'High Volatility Speculative':              'HIGH VOL',
   'Needs Further Review':                     'REVIEW',
@@ -68,6 +68,12 @@ function TickerTape({ companies }: { companies: CompanySummary[] }) {
       overflow: 'hidden',
       display: 'flex',
       alignItems: 'center',
+      width: '100vw',
+      position: 'relative',
+      left: '50%',
+      right: '50%',
+      marginLeft: '-50vw',
+      marginRight: '-50vw',
     }}>
       <div style={{
         display: 'flex',
@@ -185,11 +191,11 @@ export default function CompanyExplorer({ companies, onViewForecast, onViewAI, i
   }
 
   const riskColor = (r: string) =>
-    r === 'High Risk' ? D.error : r === 'Moderate Risk' ? D.orange : D.tertiary
+    r === 'High Risk' ? D.error : r === 'Medium Risk' ? D.orange : D.tertiary
   const riskDots  = (r: string) =>
-    r === 'High Risk' ? 3 : r === 'Moderate Risk' ? 2 : 1
+    r === 'High Risk' ? 3 : r === 'Medium Risk' ? 2 : 1
   const riskLabel = (r: string) =>
-    r === 'High Risk' ? 'H' : r === 'Moderate Risk' ? 'M' : 'L'
+    r === 'High Risk' ? 'H' : r === 'Medium Risk' ? 'M' : 'L'
 
   return (
     <div style={{ fontFamily: D.body }}>

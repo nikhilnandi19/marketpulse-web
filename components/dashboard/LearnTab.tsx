@@ -372,18 +372,206 @@ const SECTIONS: Section[] = [
 
 const ALL_CONCEPTS = SECTIONS.flatMap(s => s.concepts.map(c => ({ ...c, section: s })))
 
-// ─── Synonym-aware search ─────────────────────────────────────────────────────
+// ─── Global query alias expansion ─────────────────────────────────────────────
+// Maps a user's search word → terms that will match relevant concepts
+
+const QUERY_ALIASES: Record<string, string[]> = {
+  // Economy / macro
+  economic:         ['revenue', 'sector', 'profit', 'market', 'fundamental', 'income'],
+  economy:          ['revenue', 'sector', 'profit', 'market', 'fundamental'],
+  macro:            ['sector', 's&p', 'market index', 'fundamental'],
+  macroeconomic:    ['sector', 's&p', 'market index', 'fundamental'],
+  gdp:              ['revenue', 'sector', 'market', 'fundamental'],
+  recession:        ['risk', 'volatility', 'limitation', 'negative'],
+  inflation:        ['risk', 'volatility', 'limitation', 'interest'],
+  market:           ['s&p 500', 'sector', 'trading day', 'close price'],
+  financial:        ['revenue', 'profit', 'margin', 'ebitda', 'fundamental'],
+
+  // Investing basics
+  invest:           ['stock', 'share', 'return', 'upside', 'signal'],
+  investment:       ['stock', 'share', 'return', 'upside', 'signal'],
+  investing:        ['stock', 'share', 'return', 'upside'],
+  portfolio:        ['stock', 'return', 'total return', 'diversify'],
+  buy:              ['signal', 'opportunity', 'limitation', 'upside'],
+  sell:             ['signal', 'limitation', 'risk', 'negative'],
+  trade:            ['trading day', 'stock', 'ticker'],
+  trading:          ['trading day', 'close price', 'stock'],
+  stock:            ['share', 'equity', 'ticker', 'close price'],
+  equity:           ['stock', 'share', 'ownership'],
+  ownership:        ['stock', 'share', 'equity'],
+  dividend:         ['net income', 'fundamental', 'limitation', 'eps'],
+  etf:              ['s&p 500', 'index', 'sector'],
+  index:            ['s&p 500', 'benchmark', 'market index'],
+  indices:          ['s&p 500', 'benchmark', 'market index'],
+
+  // Company financials
+  earnings:         ['eps', 'net income', 'ebitda', 'profit', 'revenue'],
+  earn:             ['eps', 'net income', 'profit', 'revenue'],
+  profit:           ['profit margin', 'net income', 'ebitda', 'revenue'],
+  profitable:       ['profit margin', 'net income', 'ebitda'],
+  income:           ['net income', 'revenue', 'profit', 'eps'],
+  revenue:          ['sales', 'top line', 'turnover', 'income'],
+  sales:            ['revenue', 'top line', 'income'],
+  'balance sheet':  ['revenue', 'net income', 'ebitda', 'fundamental'],
+  'income statement': ['revenue', 'net income', 'profit margin'],
+  'financial health': ['profit margin', 'ebitda', 'revenue', 'fundamental'],
+  growth:           ['total return', 'upside', 'revenue', 'trend'],
+  'market cap':     ['stock', 'share', 'fundamental', 'equity'],
+  'pe ratio':       ['eps', 'earnings per share', 'valuation'],
+  valuation:        ['eps', 'ebitda', 'fundamental', 'profit'],
+  company:          ['stock', 'sector', 'ticker', 'revenue', 'fundamental'],
+  business:         ['revenue', 'profit', 'sector', 'fundamental'],
+
+  // Forecasting / models
+  predict:          ['forecast', 'model', 'naive', 'drift', 'adaptive'],
+  prediction:       ['forecast', 'model', 'naive', 'drift', 'adaptive'],
+  predicting:       ['forecast', 'model', 'adaptive', 'drift'],
+  future:           ['forecast', 'upside', 'model', 'prediction'],
+  projection:       ['forecast', 'upside', 'model'],
+  estimate:         ['forecast', 'mape', 'model', 'upside'],
+  'machine learning': ['xgboost', 'model', 'adaptive', 'forecast'],
+  ml:               ['xgboost', 'model', 'adaptive', 'forecast'],
+  algorithm:        ['model', 'adaptive', 'xgboost', 'drift'],
+  neural:           ['model', 'adaptive', 'xgboost'],
+  ensemble:         ['adaptive', 'weighted', 'blended', 'model'],
+  weighted:         ['adaptive', 'ensemble', 'blended momentum'],
+  blended:          ['adaptive momentum', 'ensemble', 'weighted'],
+  momentum:         ['adaptive momentum', 'drift', 'trend', 'moving'],
+  trend:            ['moving average', 'drift', 'linear trend', 'momentum'],
+  extrapolate:      ['drift', 'linear trend', 'forecast', 'momentum'],
+  seasonal:         ['trading day', 'limitation', 'time'],
+  timeframe:        ['adaptive momentum', 'trading day', 'forecast'],
+  xgboost:          ['model', 'forecast', 'machine learning', 'adaptive'],
+
+  // Moving averages / price smoothing
+  smooth:           ['moving average', 'ma', 'rolling average'],
+  average:          ['moving average', 'daily return', 'mape', 'mae'],
+  rolling:          ['moving average', 'rolling average', 'ma'],
+  'moving average': ['ma', 'sma', 'rolling', 'smooth', 'price average'],
+
+  // Error / accuracy
+  accurate:         ['mape', 'rmse', 'mae', 'error', 'reliability'],
+  accuracy:         ['mape', 'rmse', 'mae', 'error', 'reliability'],
+  error:            ['mape', 'rmse', 'mae', 'error metric'],
+  performance:      ['mape', 'return', 'total return', 'accuracy'],
+  confidence:       ['mape', 'reliability', 'limitation', 'forecast'],
+  reliable:         ['mape', 'reliability', 'model', 'accuracy'],
+  reliability:      ['mape', 'model reliability', 'accuracy', 'error'],
+  benchmark:        ['s&p 500', 'mape', 'sector', 'index'],
+  precision:        ['mape', 'mae', 'rmse', 'accuracy'],
+  measure:          ['mape', 'mae', 'rmse', 'standard deviation'],
+
+  // Risk & volatility
+  volatile:         ['volatility', 'risk', 'standard deviation', 'swing'],
+  dangerous:        ['risk', 'volatility', 'high risk'],
+  safe:             ['low risk', 'stable', 'volatility', 'watchlist'],
+  uncertain:        ['volatility', 'risk', 'standard deviation'],
+  crash:            ['risk', 'volatility', 'limitation'],
+  bear:             ['risk', 'negative', 'volatility', 'downside'],
+  bearish:          ['risk', 'negative', 'volatility', 'downside'],
+  bull:             ['opportunity', 'positive', 'upside', 'return'],
+  bullish:          ['opportunity', 'positive', 'upside', 'return'],
+  beta:             ['volatility', 'risk', 'standard deviation'],
+  spread:           ['standard deviation', 'volatility', 'band'],
+  swing:            ['volatility', 'risk', 'daily return'],
+  fluctuation:      ['volatility', 'risk', 'daily return', 'swing'],
+  unstable:         ['volatility', 'high risk', 'speculative'],
+  speculative:      ['high volatility', 'risk', 'volatility speculative'],
+  deviation:        ['standard deviation', 'volatility', 'error'],
+  variance:         ['standard deviation', 'volatility', 'spread'],
+  dispersion:       ['standard deviation', 'volatility'],
+
+  // Signals
+  recommendation:   ['signal', 'limitation', 'final signal'],
+  advice:           ['limitation', 'signal', 'disclaimer'],
+  signal:           ['final signal', 'forecast signal', 'system signal'],
+  alert:            ['signal', 'review', 'risk'],
+  flag:             ['review reason', 'signal', 'risk'],
+  screen:           ['final signal', 'signal'],
+  label:            ['final signal', 'risk level', 'signal'],
+  indicator:        ['signal', 'forecast signal', 'moving average', 'mape'],
+  opportunity:      ['potential opportunity', 'final signal', 'upside'],
+  watchlist:        ['stable watchlist', 'signal', 'final signal'],
+
+  // Limitations / disclaimer
+  disclaimer:       ['limitation', 'educational', 'not financial advice'],
+  warning:          ['limitation', 'risk', 'disclaimer'],
+  caution:          ['limitation', 'risk', 'volatility'],
+  'past performance': ['backtest', 'limitation', 'historical'],
+  overfitting:      ['back-testing', 'limitation', 'train test'],
+  bias:             ['backtest', 'limitation', 'overfitting'],
+  'not advice':     ['limitation', 'disclaimer'],
+  educational:      ['limitation', 'disclaimer', 'educational'],
+
+  // Data / methodology
+  backtest:         ['back-testing', 'train test', 'historical', 'out of sample'],
+  historical:       ['backtest', 'total return', 'training', 'close price'],
+  data:             ['trading day', 'close price', 'historical', 'fundamental'],
+  sample:           ['train test', 'backtest', 'out of sample'],
+  training:         ['train test', 'backtest', 'model'],
+  validation:       ['train test', 'backtest', 'mape'],
+
+  // Time
+  daily:            ['daily return', 'trading day', 'close price'],
+  yearly:           ['annualized', 'trading day', 'linear trend 252'],
+  annual:           ['annualized', 'trading day', 'linear trend'],
+  monthly:          ['30 day', 'forecast', 'moving average'],
+
+  // Charts / visuals
+  chart:            ['forecast', 'upside', 'moving average', 'price'],
+  graph:            ['forecast', 'upside', 'price', 'moving average'],
+  plot:             ['forecast', 'price', 'upside'],
+  candlestick:      ['close price', 'trading day', 'price'],
+
+  // Money / price
+  money:            ['revenue', 'profit', 'price', 'return'],
+  dollar:           ['revenue', 'profit', 'mae', 'price'],
+  price:            ['close price', 'latest price', 'forecast price'],
+  cost:             ['revenue', 'profit', 'margin', 'net income'],
+  gain:             ['return', 'upside', 'profit', 'total return'],
+  loss:             ['risk', 'volatility', 'negative', 'limitation'],
+  upside:           ['forecast upside', 'potential', 'return'],
+  downside:         ['risk', 'volatility', 'negative forecast', 'limitation'],
+
+  // Sectors / classification
+  sector:           ['gics', 'industry', 'classification', 'sector'],
+  industry:         ['sector', 'gics', 'classification'],
+  technology:       ['sector', 'classification', 'industry'],
+  healthcare:       ['sector', 'classification', 'industry'],
+  energy:           ['sector', 'classification', 'industry'],
+
+  // Options / derivatives (out of scope but redirect)
+  options:          ['limitation', 'disclaimer'],
+  derivatives:      ['limitation', 'disclaimer'],
+  short:            ['risk', 'limitation', 'volatility'],
+  leverage:         ['risk', 'volatility', 'limitation'],
+  margin:           ['profit margin', 'fundamental', 'profitability'],
+}
+
+// ─── Synonym-aware search with alias expansion ────────────────────────────────
 
 function searchConcepts(query: string) {
   const q = query.toLowerCase().trim()
   if (!q) return []
+
+  // Build expanded search terms
+  const words = q.split(/\s+/)
+  const searchTerms = new Set<string>([q])
+  for (const word of words) {
+    const aliases = QUERY_ALIASES[word]
+    if (aliases) aliases.forEach(t => searchTerms.add(t))
+  }
+  // Also check the full phrase as an alias key
+  const phraseAliases = QUERY_ALIASES[q]
+  if (phraseAliases) phraseAliases.forEach(t => searchTerms.add(t))
+
   return ALL_CONCEPTS.filter(c => {
     const haystack = [
       c.term, c.plain, c.detail, c.tag,
       ...(c.synonyms ?? []),
       c.section.title,
     ].join(' ').toLowerCase()
-    return haystack.includes(q)
+    return Array.from(searchTerms).some(term => haystack.includes(term))
   })
 }
 
@@ -429,13 +617,19 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
   const searchResults = useMemo(() => searchConcepts(query), [query])
   const isSearching = query.trim().length > 0
 
-  // All concepts for deep dive list (filtered)
+  const activeSection = openSection ? SECTIONS.find(s => s.id === openSection) ?? null : null
+
+  // All concepts for deep dive list (filtered by section tile + institutional toggle)
   const deepDiveConcepts = useMemo(() => {
-    if (deepDiveFilter === 'institutional') {
-      return ALL_CONCEPTS.filter(c => ['Model', 'Error Metric', 'Methodology', 'Signal'].includes(c.tag))
+    let concepts = ALL_CONCEPTS
+    if (openSection) {
+      concepts = concepts.filter(c => c.section.id === openSection)
     }
-    return ALL_CONCEPTS
-  }, [deepDiveFilter])
+    if (deepDiveFilter === 'institutional') {
+      concepts = concepts.filter(c => ['Model', 'Error Metric', 'Methodology', 'Signal'].includes(c.tag))
+    }
+    return concepts
+  }, [deepDiveFilter, openSection])
 
   return (
     <div style={{ fontFamily: D.body, background: D.bg, minHeight: '100vh', width: '100%' }}>
@@ -594,33 +788,43 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
 
             {/* 2×4 bento grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              {CATEGORY_CARDS.map(card => (
-                <button key={card.id}
-                  onClick={() => setOpenSection(openSection === card.id ? '' : card.id)}
-                  style={{
-                    textAlign: 'left', padding: 20,
-                    background: card.highlighted ? 'rgba(173,198,255,0.05)' : '#111113',
-                    border: `1px solid ${card.highlighted ? 'rgba(173,198,255,0.2)' : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: 12, cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', gap: 8,
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={e => {
-                    const el = e.currentTarget as HTMLElement
-                    el.style.borderColor = `${card.color}60`
-                    el.style.background = `${card.color}08`
-                  }}
-                  onMouseLeave={e => {
-                    const el = e.currentTarget as HTMLElement
-                    el.style.borderColor = card.highlighted ? 'rgba(173,198,255,0.2)' : 'rgba(255,255,255,0.08)'
-                    el.style.background = card.highlighted ? 'rgba(173,198,255,0.05)' : '#111113'
-                  }}>
-                  <span style={{ fontSize: 20, color: card.color }}>{card.icon}</span>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: D.text }}>{card.label}</div>
-                  <div style={{ fontSize: 12, color: D.textMuted, lineHeight: 1.5 }}>{card.sub}</div>
-                  <div style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, marginTop: 4 }}>{card.count}</div>
-                </button>
-              ))}
+              {CATEGORY_CARDS.map(card => {
+                const isActive = openSection === card.id
+                const idleBg = card.highlighted ? 'rgba(173,198,255,0.05)' : '#111113'
+                const idleBorder = card.highlighted ? 'rgba(173,198,255,0.2)' : 'rgba(255,255,255,0.08)'
+                return (
+                  <button key={card.id}
+                    onClick={() => setOpenSection(openSection === card.id ? '' : card.id)}
+                    style={{
+                      textAlign: 'left', padding: 20,
+                      background: isActive ? `${card.color}15` : idleBg,
+                      border: `1px solid ${isActive ? card.color : idleBorder}`,
+                      borderRadius: 12, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                      transition: 'all 0.2s ease',
+                      opacity: openSection && !isActive ? 0.55 : 1,
+                    }}
+                    onMouseEnter={e => {
+                      if (isActive) return
+                      const el = e.currentTarget as HTMLElement
+                      el.style.borderColor = `${card.color}60`
+                      el.style.background = `${card.color}08`
+                      el.style.opacity = '1'
+                    }}
+                    onMouseLeave={e => {
+                      if (isActive) return
+                      const el = e.currentTarget as HTMLElement
+                      el.style.borderColor = idleBorder
+                      el.style.background = idleBg
+                      el.style.opacity = openSection ? '0.55' : '1'
+                    }}>
+                    <span style={{ fontSize: 20, color: card.color }}>{card.icon}</span>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: isActive ? card.color : D.text }}>{card.label}</div>
+                    <div style={{ fontSize: 12, color: D.textMuted, lineHeight: 1.5 }}>{card.sub}</div>
+                    <div style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, marginTop: 4 }}>{card.count}</div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -635,7 +839,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
         }}>
 
           {/* Section header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: activeSection ? 16 : 28, flexWrap: 'wrap', gap: 12 }}>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: D.text, margin: 0, letterSpacing: '-0.02em' }}>
               Deep Dive: Methodology &amp; Metrics
             </h2>
@@ -656,6 +860,31 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
               ))}
             </div>
           </div>
+
+          {/* Active section filter banner */}
+          {activeSection && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20,
+              padding: '10px 16px',
+              background: `${activeSection.color}10`,
+              border: `1px solid ${activeSection.color}30`,
+              borderRadius: 8,
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: activeSection.color }}>{activeSection.title}</span>
+              <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted }}>
+                — {deepDiveConcepts.length} concept{deepDiveConcepts.length !== 1 ? 's' : ''}
+              </span>
+              <button onClick={() => setOpenSection('')}
+                style={{
+                  marginLeft: 'auto', fontSize: 10, fontFamily: D.mono,
+                  color: D.textMuted, background: D.container,
+                  border: `1px solid ${D.border}`, padding: '3px 10px',
+                  borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                }}>
+                SHOW ALL ×
+              </button>
+            </div>
+          )}
 
           {/* Accordion list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

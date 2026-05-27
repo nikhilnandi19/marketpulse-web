@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Sparkles, Search, AlertTriangle, X, TrendingUp, BarChart2, Paperclip, ArrowRight, Filter } from 'lucide-react'
 import type { CompanySummary, SectorSummary } from '@/lib/types'
 import { formatPercent, formatCurrency, formatCompactNumber } from '@/lib/formatters'
@@ -32,11 +32,6 @@ const D = {
   body:      'Inter, system-ui, sans-serif',
 }
 
-const PROMPT_CHIPS = [
-  "Explain NVDA's RSI divergence",
-  'Impact of Fed decision on Tech',
-  'Risk score summary',
-]
 
 function buildContext(company: CompanySummary | null, sector: SectorSummary | null): string {
   if (!company) return 'No company selected. User is asking a general market question.'
@@ -72,6 +67,95 @@ function getInitials(symbol: string): string {
   return symbol.length >= 2 ? symbol.slice(0, 2) : symbol
 }
 
+// ── Prompt pool ────────────────────────────────────────────────────────────────
+
+function getPromptPool(symbol: string): string[] {
+  return [
+    `Explain ${symbol}'s 30-day forecast signal`,
+    `What's driving ${symbol}'s recent volatility?`,
+    `How reliable is ${symbol}'s forecast model?`,
+    `Summarize ${symbol}'s fundamental health`,
+    `Is ${symbol} high or low risk vs its sector?`,
+    `What are the key risk factors for ${symbol}?`,
+    `What does ${symbol}'s final system signal indicate?`,
+    `Compare ${symbol} to its sector peers`,
+    `How does ${symbol}'s MAPE compare to the sector average?`,
+    `What would cause ${symbol}'s forecast to be wrong?`,
+    'Which sectors are showing the most 30-day upside?',
+    'Explain how the adaptive blended momentum model works',
+    'What is a good MAPE score for stock forecasting?',
+    'How is the final system signal calculated?',
+    'What does "Needs Further Review" mean for a company?',
+    'Explain the difference between MAPE and RMSE',
+    'How does annualized volatility affect the risk classification?',
+    'What does a "Stable Watchlist" signal mean?',
+    'How is ensemble weighting determined per company?',
+    'Which companies have the highest forecast reliability?',
+    'What is adaptive blended momentum in simple terms?',
+    'Impact of Fed rate decisions on Tech sector forecasts',
+    'What does "High Volatility Speculative" mean?',
+    'How should I interpret a negative 30-day forecast upside?',
+  ]
+}
+
+// ── Markdown renderer ──────────────────────────────────────────────────────────
+
+function parseInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**') && part.length > 4)
+          return <strong key={i} style={{ fontWeight: 700, color: '#e2e2e2' }}>{part.slice(2, -2)}</strong>
+        if (part.startsWith('*') && part.endsWith('*') && part.length > 2)
+          return <em key={i} style={{ fontStyle: 'italic', color: '#c2c6d6' }}>{part.slice(1, -1)}</em>
+        if (part.startsWith('`') && part.endsWith('`') && part.length > 2)
+          return <code key={i} style={{ background: 'rgba(173,198,255,0.12)', color: '#adc6ff', padding: '1px 5px', borderRadius: 3, fontSize: '0.88em', fontFamily: 'JetBrains Mono, monospace' }}>{part.slice(1, -1)}</code>
+        return <span key={i}>{part}</span>
+      })}
+    </>
+  )
+}
+
+function renderMarkdown(content: string): React.ReactNode {
+  const lines = content.split('\n')
+  return (
+    <>
+      {lines.map((line, i) => {
+        if (/^### /.test(line))
+          return <div key={i} style={{ fontSize: 13, fontWeight: 700, color: '#adc6ff', marginTop: 14, marginBottom: 4 }}>{parseInline(line.slice(4))}</div>
+        if (/^## /.test(line))
+          return <div key={i} style={{ fontSize: 14, fontWeight: 700, color: '#adc6ff', marginTop: 16, marginBottom: 5 }}>{parseInline(line.slice(3))}</div>
+        if (/^# /.test(line))
+          return <div key={i} style={{ fontSize: 15, fontWeight: 700, color: '#adc6ff', marginTop: 18, marginBottom: 6 }}>{parseInline(line.slice(2))}</div>
+        if (/^---+$/.test(line.trim()))
+          return <div key={i} style={{ borderTop: '1px solid rgba(66,71,84,0.5)', margin: '10px 0' }} />
+        if (/^[-*•] /.test(line))
+          return (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 3, lineHeight: 1.65 }}>
+              <span style={{ color: '#adc6ff', flexShrink: 0, fontSize: 10, marginTop: 3 }}>▸</span>
+              <span style={{ fontSize: 13, color: '#c2c6d6' }}>{parseInline(line.replace(/^[-*•] /, ''))}</span>
+            </div>
+          )
+        if (/^\d+\. /.test(line)) {
+          const m = line.match(/^(\d+)\. (.+)/)
+          if (m) return (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 3, lineHeight: 1.65 }}>
+              <span style={{ color: '#adc6ff', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, minWidth: 18, marginTop: 2 }}>{m[1]}.</span>
+              <span style={{ fontSize: 13, color: '#c2c6d6' }}>{parseInline(m[2])}</span>
+            </div>
+          )
+        }
+        if (line.trim() === '')
+          return <div key={i} style={{ height: 6 }} />
+        return (
+          <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: '#c2c6d6' }}>{parseInline(line)}</div>
+        )
+      })}
+    </>
+  )
+}
+
 export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQuestion }: Props) {
   const [selectedSymbol, setSelectedSymbol] = useState(defaultCompany?.symbol || 'NVDA')
   const [messages, setMessages]             = useState<Message[]>([])
@@ -79,6 +163,8 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState<string | null>(null)
   const [sidebarSearch, setSidebarSearch]   = useState('')
+  const [chipSlots, setChipSlots]           = useState([0, 1, 2])
+  const nextChipRef = useRef(3)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const company = useMemo(() => companies.find(c => c.symbol === selectedSymbol) ?? null, [companies, selectedSymbol])
@@ -101,7 +187,29 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
   }, [companies, sidebarSearch, selectedSymbol])
 
   useEffect(() => { if (defaultCompany) setSelectedSymbol(defaultCompany.symbol) }, [defaultCompany])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+  useEffect(() => {
+    if (messages.length > 0 || loading) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, loading])
+
+  const promptPool = useMemo(() => getPromptPool(selectedSymbol), [selectedSymbol])
+
+  // Reset chips whenever the selected company changes
+  useEffect(() => {
+    setChipSlots([0, 1, 2])
+    nextChipRef.current = 3
+  }, [selectedSymbol])
+
+  const handleChipClick = useCallback((slotPosition: number) => {
+    const chip = promptPool[chipSlots[slotPosition] % promptPool.length]
+    send(chip)
+    setChipSlots(prev => {
+      const next = nextChipRef.current % promptPool.length
+      nextChipRef.current++
+      return prev.map((v, i) => i === slotPosition ? next : v)
+    })
+  }, [chipSlots, promptPool]) // eslint-disable-line
   useEffect(() => {
     if (defaultQuestion) {
       const t = setTimeout(() => send(defaultQuestion), 300)
@@ -241,7 +349,7 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
         {/* Chat header */}
         <div style={{ padding: '16px 28px', borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', margin: 0, background: 'linear-gradient(90deg, #adc6ff 0%, #4edea3 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <h1 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 700, letterSpacing: '-0.03em', margin: 0, background: 'linear-gradient(90deg, #adc6ff 0%, #4edea3 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               MarketPulse AI
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 3, background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.25)' }}>
@@ -311,10 +419,10 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
                     </div>
                   )}
                   <div style={msg.role === 'assistant'
-                    ? { background: D.container, border: `1px solid ${D.border}`, borderRadius: '4px 12px 12px 12px', padding: '12px 16px', fontSize: 13, lineHeight: 1.7, color: D.text, whiteSpace: 'pre-wrap' }
+                    ? { background: D.container, border: `1px solid ${D.border}`, borderRadius: '4px 12px 12px 12px', padding: '12px 16px' }
                     : { background: `${D.secondary}12`, border: `1px solid ${D.secondary}25`, borderRadius: '12px 4px 12px 12px', padding: '12px 16px', fontSize: 13, lineHeight: 1.7, color: D.text, whiteSpace: 'pre-wrap' }
                   }>
-                    {msg.content}
+                    {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
                   </div>
                 </div>
               </div>
@@ -350,20 +458,19 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
         {/* ── Input area ──────────────────────────────────────────────────── */}
         <div style={{ padding: '16px 28px 24px', flexShrink: 0 }}>
 
-          {/* Chips above input */}
+          {/* Chips above input — dynamic, rotate on use */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {[
-              company ? `Explain ${company.symbol}'s RSI divergence` : PROMPT_CHIPS[0],
-              'Impact of Fed decision on Tech',
-              'Risk score summary',
-            ].map(chip => (
-              <button key={chip} onClick={() => send(chip)} disabled={loading}
-                style={{ ...chipStyle(), opacity: loading ? 0.4 : 1 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}50`; (e.currentTarget as HTMLElement).style.color = D.textSec }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = D.border; (e.currentTarget as HTMLElement).style.color = D.textMuted }}>
-                {chip}
-              </button>
-            ))}
+            {chipSlots.map((poolIdx, slotPos) => {
+              const chip = promptPool[poolIdx % promptPool.length]
+              return (
+                <button key={`${slotPos}-${poolIdx}`} onClick={() => handleChipClick(slotPos)} disabled={loading}
+                  style={{ ...chipStyle(), opacity: loading ? 0.4 : 1 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}50`; (e.currentTarget as HTMLElement).style.color = D.textSec }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = D.border; (e.currentTarget as HTMLElement).style.color = D.textMuted }}>
+                  {chip}
+                </button>
+              )
+            })}
           </div>
 
           {/* Textarea container */}
