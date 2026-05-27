@@ -328,7 +328,7 @@ export default function ExecutiveOverview({ companies, sectors, kpis, onNavigate
             <p style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.5 }}>
               Dashboard data sourced from Databricks pipeline.
               {filtered.length === companies.length
-                ? ` All ${companies.length} S&P 500 companies loaded. CSV-based static deployment — refresh for latest exported data.`
+                ? ` All ${companies.length} S&P 500 companies loaded. CSV-based static deployment. Refresh for latest exported data.`
                 : ` Showing ${filtered.length} of ${companies.length} companies based on active filters.`}
             </p>
           </div>

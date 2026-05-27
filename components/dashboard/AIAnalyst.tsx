@@ -36,7 +36,7 @@ const D = {
 function buildContext(company: CompanySummary | null, sector: SectorSummary | null): string {
   if (!company) return 'No company selected. User is asking a general market question.'
   return [
-    `Company: ${company.symbol} — ${company.company_name}`,
+    `Company: ${company.symbol}, ${company.company_name}`,
     `Sector: ${company.sector} | Industry: ${company.industry}`,
     `Latest Price: $${company.latest_price.toFixed(2)}`,
     `30D Forecast Price: $${company.forecast_30d_price.toFixed(2)} (${formatPercent(company.forecast_30d_upside_pct)})`,
@@ -229,7 +229,7 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
       const data = await res.json()
       if (!res.ok || data.error) setError(data.error || 'API error')
       else setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
-    } catch { setError('Network error — please try again.') }
+    } catch { setError('Network error. Please try again.') }
     finally { setLoading(false) }
   }
 
@@ -352,10 +352,6 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
             <h1 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 700, letterSpacing: '-0.03em', margin: 0, background: 'linear-gradient(90deg, #adc6ff 0%, #4edea3 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               MarketPulse AI
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 3, background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.25)' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: D.tertiary, display: 'inline-block', animation: 'pulse 2s infinite' }} />
-              <span style={{ fontSize: 9, fontFamily: D.mono, color: D.tertiary, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Analyst Live</span>
-            </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 3, border: `1px solid ${D.border}`, background: 'transparent', color: D.textSec, fontSize: 11, fontFamily: D.mono, cursor: 'pointer' }}>

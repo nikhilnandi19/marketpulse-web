@@ -25,7 +25,7 @@ const SOURCE_STYLES = {
 const SECTIONS: Section[] = [
   {
     id: 'basics', icon: BookOpen, title: 'Stock Market Basics', color: '#60A5FA',
-    summary: 'Stocks, indices, tickers, sectors — the foundation of everything.',
+    summary: 'Stocks, indices, tickers, sectors: the foundation of everything.',
     concepts: [
       {
         term: 'Stock / Share', tag: 'Fundamental',
@@ -69,7 +69,7 @@ const SECTIONS: Section[] = [
         term: 'Trading Day', tag: 'Time',
         synonyms: ['market day', 'trading session', 'business day', 'market session', 'open market day', 'exchange day'],
         plain: 'A day when the stock market is open for buying and selling.',
-        detail: 'There are approximately 252 trading days per year. Weekends and public holidays are excluded. This is important for forecasting — 30 trading days is roughly 6 calendar weeks.',
+        detail: 'There are approximately 252 trading days per year. Weekends and public holidays are excluded. This is important for forecasting: 30 trading days is roughly 6 calendar weeks.',
         example: '30 trading days ≈ 6 calendar weeks. 252 trading days ≈ 1 calendar year.',
       },
       {
@@ -167,7 +167,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: 'forecast', icon: GitBranch, title: 'Forecasting Models', color: '#A78BFA',
-    summary: 'The models used — Naive, Moving Average, Drift, Adaptive Momentum, and Linear Trend.',
+    summary: 'The models used: Naive, Moving Average, Drift, Adaptive Momentum, and Linear Trend.',
     concepts: [
       {
         term: 'Naive Forecast', tag: 'Model',
@@ -188,14 +188,14 @@ const SECTIONS: Section[] = [
         term: 'Drift Forecast', tag: 'Model',
         synonyms: ['trend extrapolation', 'historical drift', 'price drift', 'momentum drift', 'random walk drift'],
         plain: 'Predicts future price by extrapolating the recent average daily change.',
-        detail: 'Calculates the average daily price change over recent history and projects it forward. In MarketPulse, this is kept as a scenario/comparison line — not the main forecast.',
+        detail: 'Calculates the average daily price change over recent history and projects it forward. In MarketPulse, this is kept as a scenario/comparison line, not the main forecast.',
         example: 'Stock at $150, avg daily gain = $0.20 → 30-day drift = $150 + (30 × $0.20) = $156.',
         links: [{ label: 'Random Walk & Drift', url: 'https://www.investopedia.com/terms/r/randomwalktheory.asp', source: 'investopedia' }],
       },
       {
         term: 'Adaptive Blended Momentum', tag: 'Model',
         synonyms: ['adaptive momentum', 'blended momentum', 'multi-timeframe momentum', 'weighted momentum', 'damped momentum', 'main forecast', 'momentum blending'],
-        plain: 'The main MarketPulse forecast — blends momentum across multiple timeframes with damping.',
+        plain: 'The main MarketPulse forecast: blends momentum across multiple timeframes with damping.',
         detail: 'Combines 5D, 10D, 21D, 63D, and 252D momentum signals with weights and a damping factor. This means it reacts to recent trends without overreacting to short-term noise.',
         example: 'If a stock dropped sharply in the last 10 days, the adaptive model will reflect that downward pressure.',
       },
@@ -222,13 +222,13 @@ const SECTIONS: Section[] = [
   },
   {
     id: 'errors', icon: BarChart2, title: 'Model Error Metrics', color: '#F87171',
-    summary: 'MAPE, MAE, RMSE — how we measure forecast accuracy.',
+    summary: 'MAPE, MAE, RMSE: how we measure forecast accuracy.',
     concepts: [
       {
-        term: 'MAPE — Mean Absolute Percentage Error', tag: 'Error Metric',
+        term: 'MAPE: Mean Absolute Percentage Error', tag: 'Error Metric',
         synonyms: ['mape', 'mean absolute percentage error', 'percentage error', 'forecast accuracy', 'model accuracy', 'prediction error', 'error percentage', 'forecast error'],
         plain: "On average, how far off was the model's prediction, as a percentage?",
-        detail: 'MAPE is the most important error metric in this dashboard because it is scale-independent — it allows comparison across stocks with very different price levels.\n\nFormula: average of |actual − predicted| ÷ actual × 100\n\nIn this dashboard:\n• <2% = Elite / Very Strong\n• 2–3% = Strong\n• 3–5% = Moderate\n• >5% = Higher Error',
+        detail: 'MAPE is the most important error metric in this dashboard because it is scale-independent, allowing comparison across stocks with very different price levels.\n\nFormula: average of |actual − predicted| ÷ actual × 100\n\nIn this dashboard:\n• <2% = Elite / Very Strong\n• 2–3% = Strong\n• 3–5% = Moderate\n• >5% = Higher Error',
         example: 'Stock at $100, model predicted $102 → error = 2%. If this happens every day on average, MAPE = 2%.',
         links: [
           { label: 'MAPE Definition', url: 'https://www.investopedia.com/terms/m/mape.asp', source: 'investopedia' },
@@ -236,7 +236,7 @@ const SECTIONS: Section[] = [
         ],
       },
       {
-        term: 'MAE — Mean Absolute Error', tag: 'Error Metric',
+        term: 'MAE: Mean Absolute Error', tag: 'Error Metric',
         synonyms: ['mae', 'mean absolute error', 'average error', 'dollar error', 'absolute error', 'average miss'],
         plain: "On average, how many dollars was the model off by?",
         detail: 'Unlike MAPE, MAE is in the same units as the stock price. A MAE of $3.50 means the model was $3.50 away from actual price on average.',
@@ -244,7 +244,7 @@ const SECTIONS: Section[] = [
         links: [{ label: 'Mean Absolute Error', url: 'https://www.investopedia.com/terms/m/mean-absolute-error.asp', source: 'investopedia' }],
       },
       {
-        term: 'RMSE — Root Mean Squared Error', tag: 'Error Metric',
+        term: 'RMSE: Root Mean Squared Error', tag: 'Error Metric',
         synonyms: ['rmse', 'root mean squared error', 'squared error', 'penalized error', 'large error penalty'],
         plain: 'Like MAE, but it punishes large errors more harshly.',
         detail: 'RMSE squares each error before averaging, then takes the square root. One large miss hurts the score more than several small misses.',
@@ -258,13 +258,13 @@ const SECTIONS: Section[] = [
   },
   {
     id: 'fundamentals', icon: Percent, title: 'Financial Fundamentals', color: '#34D399',
-    summary: 'Revenue, profit margin, EBITDA, EPS — company health metrics.',
+    summary: 'Revenue, profit margin, EBITDA, EPS: company health metrics.',
     concepts: [
       {
         term: 'Revenue', tag: 'Fundamental',
         synonyms: ['sales', 'top line', 'income', 'gross revenue', 'turnover', 'total sales', 'gross income'],
         plain: 'The total amount of money a company earns from its products or services.',
-        detail: "Revenue is the 'top line' of a company's income statement. It does not account for costs — a company can have high revenue but still be losing money.",
+        detail: "Revenue is the 'top line' of a company's income statement. It does not account for costs, so a company can have high revenue but still be losing money.",
         example: 'Apple earns hundreds of billions in revenue each year from iPhone, Mac, services, etc.',
         links: [{ label: 'Revenue Definition', url: 'https://www.investopedia.com/terms/r/revenue.asp', source: 'investopedia' }],
       },
@@ -296,7 +296,7 @@ const SECTIONS: Section[] = [
         ],
       },
       {
-        term: 'EPS — Earnings Per Share', tag: 'Fundamental',
+        term: 'EPS: Earnings Per Share', tag: 'Fundamental',
         synonyms: ['eps', 'earnings per share', 'per share profit', 'share earnings', 'per share earnings'],
         plain: 'How much profit the company made per share of stock.',
         detail: 'EPS = Net Income ÷ number of shares. Lets investors compare profitability across companies of different sizes.',
@@ -307,7 +307,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: 'signals', icon: Zap, title: 'Dashboard Signals & Labels', color: '#F59E0B',
-    summary: "Final signal, forecast signal, risk level — what they mean and how they're calculated.",
+    summary: "Final signal, forecast signal, risk level: what they mean and how they're calculated.",
     concepts: [
       {
         term: 'Forecast Signal', tag: 'Signal',
@@ -334,7 +334,7 @@ const SECTIONS: Section[] = [
         term: 'Review Reason', tag: 'Label',
         synonyms: ['review flag', 'flag reason', 'warning reason', 'needs review', 'conflict reason', 'review explanation'],
         plain: 'Why a company was placed in the "Needs Further Review" category.',
-        detail: 'Some companies have conflicting signals — e.g. positive forecast but very high volatility. The review reason explains the specific conflict.',
+        detail: 'Some companies have conflicting signals, e.g. positive forecast but very high volatility. The review reason explains the specific conflict.',
         example: '"High risk without positive forecast" = high volatility + non-positive forecast direction.',
       },
     ],
@@ -348,7 +348,7 @@ const SECTIONS: Section[] = [
         synonyms: ['disclaimer', 'not financial advice', 'model limitations', 'forecast limits', 'prediction caveats', 'not a recommendation'],
         plain: 'Stock prices are affected by thousands of factors these models cannot see.',
         detail: 'These models only use historical price data. They do not account for earnings reports, news, interest rates, company management changes, geopolitical events, or market sentiment.',
-        example: 'A company could have a strong upward trend and "Positive Forecast," then surprise with bad earnings — and drop 20% in a day.',
+        example: 'A company could have a strong upward trend and "Positive Forecast," then surprise with bad earnings and drop 20% in a day.',
       },
       {
         term: 'Back-testing ≠ future accuracy', tag: 'Limitation',
@@ -646,7 +646,6 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
             border: `1px solid ${D.border}`,
             borderRadius: 999,
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: D.primary, display: 'inline-block' }} />
             <span style={{ fontFamily: D.mono, fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: D.textMuted }}>
               Market Education Hub
             </span>
@@ -709,7 +708,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
           <div style={{ maxWidth: 720, margin: '12px auto 0' }}>
             {searchResults.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px', color: D.textMuted, fontSize: 13, fontFamily: D.mono }}>
-                No results for "{query}" — try a synonym or related term.
+                No results for "{query}". Try a synonym or related term.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -872,7 +871,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
             }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: activeSection.color }}>{activeSection.title}</span>
               <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted }}>
-                — {deepDiveConcepts.length} concept{deepDiveConcepts.length !== 1 ? 's' : ''}
+                , {deepDiveConcepts.length} concept{deepDiveConcepts.length !== 1 ? 's' : ''}
               </span>
               <button onClick={() => setOpenSection('')}
                 style={{

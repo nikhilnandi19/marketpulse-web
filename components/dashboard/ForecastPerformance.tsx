@@ -263,7 +263,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             Forecast <span style={{ color: '#adc6ff' }}>Performance</span>
           </h1>
           <p style={{ fontSize: 15, color: D.textMuted, lineHeight: 1.6 }}>
-            Model back-test performance and 30-day forward projections — single company view
+            Model back-test performance and 30-day forward projections, single company view
           </p>
         </div>
 
@@ -646,7 +646,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
         <div style={card}>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body }}>
-              Forecast Snapshot — Day {selectedHorizon}
+              Forecast Snapshot: Day {selectedHorizon}
             </h3>
             <button style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '5px 12px', borderRadius: 4, cursor: 'pointer', fontFamily: D.body }}>
               <Download size={11} /> Export Data

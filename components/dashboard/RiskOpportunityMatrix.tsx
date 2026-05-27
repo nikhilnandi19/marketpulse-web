@@ -191,7 +191,7 @@ export default function RiskOpportunityMatrix({ companies, onSelectCompany }: Pr
           </span>
         </h1>
         <p style={{ color: D.textMuted, fontSize: 15, margin: 0, lineHeight: 1.6 }}>
-          Forecast upside vs. annualized volatility — each point = one company — color = final signal
+          Forecast upside vs. annualized volatility. Each point = one company. Color = final signal.
         </p>
       </div>
 
@@ -464,7 +464,7 @@ export default function RiskOpportunityMatrix({ companies, onSelectCompany }: Pr
           {/* Axis labels below chart */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
             <span style={{ fontSize: 9, fontFamily: D.mono, color: D.textMuted }}>← Negative Upside</span>
-            <span style={{ fontSize: 9, fontFamily: D.mono, color: D.textMuted }}>X — 30D Forecast Upside %  ·  Y — Annualized Volatility %  ·  {filtered.length} companies</span>
+            <span style={{ fontSize: 9, fontFamily: D.mono, color: D.textMuted }}>X: 30D Forecast Upside %  ·  Y: Annualized Volatility %  ·  {filtered.length} companies</span>
             <span style={{ fontSize: 9, fontFamily: D.mono, color: D.textMuted }}>Positive Upside →</span>
           </div>
         </div>

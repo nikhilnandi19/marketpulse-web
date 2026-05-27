@@ -226,19 +226,13 @@ export default function Home() {
           {/* ── Hero — ZIP 6 style ────────────────────────────────────────── */}
           <section style={{ padding: '80px 48px 72px', maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }}>
             <div>
-              {/* Live badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4edea3', boxShadow: '0 0 8px #4edea3' }} />
-                <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#4edea3', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Live S&P 500 Analytics</span>
-              </div>
-
               <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#e2e2e2', fontFamily: 'Inter, system-ui, sans-serif', marginBottom: 24 }}>
                 Explainable market<br />
                 <span style={{ color: '#adc6ff' }}>signals</span> for the<br />S&P 500
               </h1>
 
               <p style={{ fontSize: 16, color: '#8c909f', lineHeight: 1.65, marginBottom: 36, maxWidth: 440 }}>
-                Forecasts, volatility, sector context, and AI summaries — built with Databricks, XGBoost Direct, and adaptive momentum models.
+                Forecasts, volatility, sector context, and AI summaries, built with Databricks, XGBoost Direct, and adaptive momentum models.
               </p>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -263,7 +257,6 @@ export default function Home() {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>System Status</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4edea3', boxShadow: '0 0 6px #4edea3' }} />
                     <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#4edea3', letterSpacing: '0.06em' }}>OPERATIONAL</span>
                   </div>
                 </div>
@@ -347,7 +340,7 @@ export default function Home() {
                 Forecast Performance
               </h2>
               <p style={{ fontSize: 15, color: '#8c909f', lineHeight: 1.65, marginBottom: 24 }}>
-                Seven forecasting models — from Naive benchmarks to deep XGBoost Direct ensembles and Adaptive Momentum — evaluated on a 90-day test window for maximum predictive accountability.
+                Seven forecasting models, from Naive benchmarks to deep XGBoost Direct ensembles and Adaptive Momentum, evaluated on a 90-day test window for maximum predictive accountability.
               </p>
               {/* Model cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
@@ -461,13 +454,9 @@ export default function Home() {
             <div style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 28 }}>
               <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Intelligence</div>
               <h3 style={{ fontSize: 28, fontWeight: 700, color: '#e2e2e2', fontFamily: 'Inter, system-ui, sans-serif', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 12 }}>MarketPulse AI</h3>
-              <p style={{ fontSize: 14, color: '#8c909f', lineHeight: 1.6, marginBottom: 20 }}>Plain-English explanations of any company's forecast, risk profile, and fundamentals. Powered by OpenRouter AI — grounded in your dashboard data.</p>
+              <p style={{ fontSize: 14, color: '#8c909f', lineHeight: 1.6, marginBottom: 20 }}>Plain-English explanations of any company's forecast, risk profile, and fundamentals. Powered by OpenRouter AI, grounded in your dashboard data.</p>
               {/* AI response preview */}
               <div style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4edea3', boxShadow: '0 0 4px #4edea3' }} />
-                  <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#4edea3', letterSpacing: '0.08em', textTransform: 'uppercase' }}>AI · Analyst Live</span>
-                </div>
                 <p style={{ fontSize: 12, color: '#c2c6d6', lineHeight: 1.55, fontFamily: 'Inter, system-ui, sans-serif', fontStyle: 'italic', marginBottom: 10 }}>
                   "AAPL shows a mild positive adaptive forecast of +2.76% over 30 trading days. Model reliability is Very Strong at 1.34% MAPE."
                 </p>
@@ -536,7 +525,7 @@ export default function Home() {
                 <span className="font-bold" style={{ fontSize: 20, color: '#e0e3e5' }}>MarketPulse</span>
                 <p style={{ fontSize: 12, letterSpacing: '0.05em', color: 'rgba(203,195,215,0.60)', maxWidth: 320, lineHeight: 1.6 }}>
                   S&P 500 Forecasting &amp; Risk Dashboard. Built during Datacrew data science internship.
-                  Educational use only — not financial advice.
+                  Educational use only, not financial advice.
                 </p>
               </div>
               <div className="flex flex-wrap gap-6 items-center">
