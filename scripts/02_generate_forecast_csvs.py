@@ -448,12 +448,26 @@ def build_dynamic_weights(backtest: pd.DataFrame) -> pd.DataFrame:
         * metrics["role_multiplier"]
     )
 
-    weights = (
-        metrics
-        .groupby("symbol", group_keys=False)
-        .apply(allocate_capped_weights)
-        .reset_index(drop=True)
-    )
+    # Avoid pandas-version-dependent groupby.apply behavior.
+    # Some pandas versions exclude grouping columns from apply output, which can drop `symbol`.
+    weight_frames = []
+
+    for symbol, group in metrics.groupby("symbol", sort=False):
+        group = group.copy()
+        group["symbol"] = symbol
+
+        allocated = allocate_capped_weights(group)
+        allocated["symbol"] = symbol
+
+        weight_frames.append(allocated)
+
+    if not weight_frames:
+        raise ValueError("No model weights were generated.")
+
+    weights = pd.concat(weight_frames, ignore_index=True)
+
+    if "symbol" not in weights.columns:
+        raise ValueError("Dynamic weights table is missing required column: symbol")
 
     weights["recent_mape"] = weights["recent_mape"].round(6)
     weights["directional_accuracy"] = weights["directional_accuracy"].round(6)
