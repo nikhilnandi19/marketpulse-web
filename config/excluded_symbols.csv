@@ -1,0 +1,7 @@
+symbol,reason
+CMA,No active yfinance data returned; likely stale/delisted/acquisition-related ticker
+DAY,Dayforce acquired by Thoma Bravo; ticker no longer active
+MMC,Old Marsh McLennan ticker; Yahoo now appears to use MRSH
+HOLX,Stale yfinance data; latest available date materially behind active market date
+SEE,Stale yfinance data; latest available date materially behind active market date
+CTRA,Stale yfinance data; latest available date materially behind active market date

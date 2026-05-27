@@ -1,0 +1,2 @@
+companies_analyzed,avg_forecast_30d_upside_pct,avg_model_mape,avg_annualized_volatility_pct,avg_profit_margin_pct,positive_forecast_count,neutral_forecast_count,negative_forecast_count,potential_opportunities,stable_watchlist,needs_further_review,weak_negative,high_volatility_speculative
+528,1.3536,1.5503,31.7677,14.0909,180,228,120,144,196,116,57,15
