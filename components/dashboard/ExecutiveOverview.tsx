@@ -169,19 +169,23 @@ export default function ExecutiveOverview({ companies, sectors, kpis, onNavigate
       {k && (
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0, marginBottom: 48, border: `1px solid ${S.border}` }}>
           {[
-            { label: 'Companies',       value: k.companies.toLocaleString(), sub: 'in filtered universe',   color: S.textPrimary },
+            { label: 'Companies',       value: k.companies.toLocaleString(), sub: 'in filtered universe',   color: S.textPrimary, clickable: true },
             { label: 'Avg 30D Upside',  value: formatPercent(k.upside),     sub: 'adaptive momentum',      color: k.upside >= 0 ? S.positive : S.negative },
             { label: 'Avg Model MAPE',  value: `${k.mape.toFixed(2)}%`,     sub: 'best model error rate',  color: S.secondary  },
             { label: 'Avg Volatility',  value: `${k.vol.toFixed(1)}%`,      sub: 'annualized volatility',  color: S.textPrimary },
             { label: 'Avg Profit Margin', value: `${k.margin.toFixed(1)}%`, sub: 'net income / revenue',   color: S.textPrimary },
-          ].map(({ label, value, sub, color }, i) => (
-            <div key={label} style={{ ...cardStyle, padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 128, borderLeft: i > 0 ? `1px solid ${S.border}` : 'none' }}>
+          ].map(({ label, value, sub, color, clickable }, i) => (
+            <div key={label}
+              onClick={clickable ? () => onNavigateToExplorer?.() : undefined}
+              onMouseEnter={clickable ? e => { (e.currentTarget as HTMLElement).style.background = 'rgba(173,198,255,0.04)' } : undefined}
+              onMouseLeave={clickable ? e => { (e.currentTarget as HTMLElement).style.background = cardStyle.background as string } : undefined}
+              style={{ ...cardStyle, padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 128, borderLeft: i > 0 ? `1px solid ${S.border}` : 'none', cursor: clickable ? 'pointer' : 'default', transition: 'background 0.15s' }}>
               <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: S.textSecondary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                 {label}
               </span>
               <div>
                 <div style={{ fontSize: 36, fontWeight: 700, lineHeight: 1, color, fontFamily: 'Geist, sans-serif', letterSpacing: '-0.02em' }}>{value}</div>
-                <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: S.textSecondary, marginTop: 4 }}>{sub}</div>
+                <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: clickable ? S.primary : S.textSecondary, marginTop: 4 }}>{clickable ? 'View all in Explorer →' : sub}</div>
               </div>
             </div>
           ))}

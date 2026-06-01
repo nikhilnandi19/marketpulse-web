@@ -7,6 +7,101 @@ import type {
   ModelErrorBand,
 } from './types'
 
+/**
+ * Fallback company names for tickers where the CSV pipeline writes the
+ * ticker symbol as the company_name (i.e. company_name === symbol).
+ * These are applied at load time so every component gets the real name.
+ */
+const COMPANY_NAME_OVERRIDES: Record<string, string> = {
+  A:    'Agilent Technologies',
+  ABNB: 'Airbnb',
+  ACGL: 'Arch Capital Group',
+  AMTM: 'Amentum Holdings',
+  AXON: 'Axon Enterprise',
+  BALL: 'Ball Corporation',
+  BG:   'Bunge Global',
+  BLDR: 'Builders FirstSource',
+  BRO:  'Brown & Brown',
+  BX:   'Blackstone',
+  CEG:  'Constellation Energy',
+  COIN: 'Coinbase Global',
+  COR:  'Cencora',
+  CPAY: 'Corpay',
+  CPT:  'Camden Property Trust',
+  CRL:  'Charles River Laboratories',
+  CRWD: 'CrowdStrike Holdings',
+  CSGP: 'CoStar Group',
+  CZR:  'Caesars Entertainment',
+  DECK: 'Deckers Outdoor',
+  DELL: 'Dell Technologies',
+  DOC:  'Healthpeak Properties',
+  EG:   'Everest Group',
+  ELV:  'Elevance Health',
+  ENPH: 'Enphase Energy',
+  EPAM: 'EPAM Systems',
+  EQT:  'EQT Corporation',
+  ERIE: 'Erie Indemnity',
+  FDS:  'FactSet Research Systems',
+  FICO: 'Fair Isaac Corporation',
+  FSLR: 'First Solar',
+  GDDY: 'GoDaddy',
+  GEHC: 'GE HealthCare Technologies',
+  GEN:  'Gen Digital',
+  GEV:  'GE Vernova',
+  GNRC: 'Generac Holdings',
+  HUBB: 'Hubbell',
+  INVH: 'Invitation Homes',
+  JBL:  'Jabil',
+  KDP:  'Keurig Dr Pepper',
+  KKR:  'KKR & Co.',
+  KVUE: 'Kenvue',
+  LULU: 'Lululemon Athletica',
+  META: 'Meta Platforms',
+  MOH:  'Molina Healthcare',
+  MPWR: 'Monolithic Power Systems',
+  MRNA: 'Moderna',
+  MTCH: 'Match Group',
+  NDSN: 'Nordson Corporation',
+  NXPI: 'NXP Semiconductors',
+  ON:   'ON Semiconductor',
+  PANW: 'Palo Alto Networks',
+  PCG:  'PG&E Corporation',
+  PLTR: 'Palantir Technologies',
+  PODD: 'Insulet Corporation',
+  POOL: 'Pool Corporation',
+  PTC:  'PTC Inc.',
+  RBLX: 'Roblox Corporation',
+  RVTY: 'Revvity',
+  SMCI: 'Super Micro Computer',
+  SNOW: 'Snowflake',
+  SOLV: 'Solventum',
+  SPOT: 'Spotify Technology',
+  STLD: 'Steel Dynamics',
+  STT:  'State Street Corporation',
+  SW:   'Smurfit WestRock',
+  TECH: 'Bio-Techne',
+  TER:  'Teradyne',
+  TRGP: 'Targa Resources',
+  TRMB: 'Trimble Inc.',
+  TSLA: 'Tesla',
+  UBER: 'Uber Technologies',
+  VICI: 'VICI Properties',
+  VLTO: 'Veralto Corporation',
+  VST:  'Vistra',
+  VTRS: 'Viatris',
+  WBD:  'Warner Bros. Discovery',
+  WTW:  'Willis Towers Watson',
+  ZS:   'Zscaler',
+}
+
+function resolveCompanyName(symbol: string, csvName: string): string {
+  // If the CSV wrote the ticker as its own name, use our curated override
+  if (!csvName || csvName === symbol) {
+    return COMPANY_NAME_OVERRIDES[symbol] ?? symbol
+  }
+  return csvName
+}
+
 function parseNum(val: any): number | null {
   if (val === null || val === undefined || val === '' || val === 'null') return null
   const n = Number(val)
@@ -65,7 +160,7 @@ export async function loadCompanySummary(): Promise<CompanySummary[]> {
     '/data/marketpulse_dashboard_company_summary.csv',
     (r) => ({
       symbol: r.symbol || '',
-      company_name: r.company_name || r.symbol || '',
+      company_name: resolveCompanyName(r.symbol || '', r.company_name || ''),
       sector: r.sector || 'Unknown',
       industry: r.industry || 'Unknown',
       first_date: r.first_date || '',

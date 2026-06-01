@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Activity, BarChart2, GitBranch, Globe, Crosshair, Bot, BookOpen, TrendingUp, Sparkles, AlertTriangle, ArrowUpRight, Info } from 'lucide-react'
 import ExecutiveOverview from '@/components/dashboard/ExecutiveOverview'
 import CompanyExplorer from '@/components/dashboard/CompanyExplorer'
@@ -64,6 +64,22 @@ function GlassCard({ children, hoverColor = 'rgba(208,188,255,0.3)', className =
   )
 }
 
+// ── Hero preview helpers ───────────────────────────────────────────────────────
+
+const HERO_TICKER_SYMS = ['NVDA','AAPL','MSFT','TSLA','AMZN','GOOGL','META','AMD','NFLX','JPM']
+const HERO_TABLE_SYMS  = ['NVDA','AAPL','AMD','TSLA','MSFT','META','AMZN','GOOGL']
+
+function heroSignal(signal: string): { label: string; color: string } {
+  const m: Record<string, { label: string; color: string }> = {
+    'Potential Opportunity':                 { label: 'OPPORTUNITY', color: '#4edea3' },
+    'Stable Watchlist':                      { label: 'STABLE',      color: '#adc6ff' },
+    'High Volatility Speculative':           { label: 'HIGH VOL',    color: '#f59e0b' },
+    'Needs Further Review':                  { label: 'REVIEW',      color: '#8c909f' },
+    'Weak Fundamentals / Negative Forecast': { label: 'RISK WARN',   color: '#f87171' },
+  }
+  return m[signal] ?? { label: 'N/A', color: '#8c909f' }
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string | null>(null)
   const [companies, setCompanies] = useState<CompanySummary[]>([])
@@ -109,6 +125,49 @@ export default function Home() {
   const navigateToAI = useCallback((company: CompanySummary) => {
     setSelectedCompany(company); setActiveTab('ai')
   }, [])
+
+  // Hero preview data — derived from real companies, updates automatically with data
+  const heroTicker = useMemo(() => {
+    if (!companies.length) return HERO_TICKER_SYMS.map(s => ({ sym: s, up: 0, loaded: false }))
+    const items = HERO_TICKER_SYMS
+      .map(sym => companies.find(c => c.symbol === sym))
+      .filter((c): c is CompanySummary => !!c)
+      .map(c => ({ sym: c.symbol, up: c.forecast_30d_upside_pct, loaded: true }))
+    return [...items, ...items] // double for seamless loop
+  }, [companies])
+
+  const heroTableRows = useMemo(() => {
+    if (!companies.length) return []
+    return HERO_TABLE_SYMS
+      .map(sym => companies.find(c => c.symbol === sym))
+      .filter((c): c is CompanySummary => !!c)
+      .sort((a, b) => b.forecast_30d_upside_pct - a.forecast_30d_upside_pct)
+      .slice(0, 3)
+      .map(c => {
+        const { label, color } = heroSignal(c.final_signal)
+        return {
+          sym:  c.symbol,
+          name: c.company_name.length > 16 ? c.company_name.slice(0, 15) + '.' : c.company_name,
+          p:    `$${c.latest_price.toFixed(2)}`,
+          up:   (c.forecast_30d_upside_pct >= 0 ? '+' : '') + c.forecast_30d_upside_pct.toFixed(1) + '%',
+          sig:  label,
+          sc:   color,
+        }
+      })
+  }, [companies])
+
+  const heroSectors = useMemo(() => {
+    if (!sectors.length) return []
+    return [...sectors]
+      .sort((a, b) => b.avg_forecast_30d_upside_pct - a.avg_forecast_30d_upside_pct)
+      .slice(0, 4)
+      .map(s => ({
+        label:  s.sector,
+        upside: (s.avg_forecast_30d_upside_pct >= 0 ? '+' : '') + s.avg_forecast_30d_upside_pct.toFixed(2) + '%',
+        vol:    s.avg_annualized_volatility_pct.toFixed(1) + '%',
+        pos:    s.avg_forecast_30d_upside_pct >= 0,
+      }))
+  }, [sectors])
 
   const showHero = activeTab === null
 
@@ -267,7 +326,7 @@ export default function Home() {
                   { l: 'Volatility', v: '31.8%', c: '#fb923c' },
                   { l: 'Avg MAPE', v: '1.55%', c: '#d0bcff' },
                   { l: 'Avg Upside', v: '+1.35%', c: '#4edea3' },
-                  { l: 'Companies', v: '528', c: '#e2e2e2' },
+                  { l: 'Companies', v: companies.length ? companies.length.toString() : '—', c: '#e2e2e2' },
                 ].map(({ l, v, c }) => (
                   <div key={l} style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '12px 16px' }}>
                     <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>{l}</div>
@@ -285,11 +344,16 @@ export default function Home() {
           {/* Company Explorer */}
           <section style={{ maxWidth: 1200, margin: '0 auto', padding: '80px 48px', display: 'grid', gridTemplateColumns: '5fr 4fr', gap: 80, alignItems: 'center' }}>
             <div style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden' }}>
-              {/* Ticker tape */}
+              {/* Ticker tape — live from data */}
               <div style={{ background: '#1e2020', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '8px 0', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', gap: 0, animation: 'tickerScroll 25s linear infinite', whiteSpace: 'nowrap' }}>
-                  {['AAPL +2.76%','NVDA +5.91%','MSFT -0.34%','TSLA -1.12%','AMZN +1.83%','GOOGL +3.2%','AAPL +2.76%','NVDA +5.91%'].map((t, i) => (
-                    <span key={i} style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: t.includes('-') ? '#f87171' : '#4edea3', paddingInline: 20, borderRight: '1px solid rgba(255,255,255,0.06)' }}>{t}</span>
+                  {heroTicker.map((t: { sym: string; up: number; loaded: boolean }, i: number) => (
+                    <span key={i} style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', paddingInline: 20, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'inline-flex', gap: 6 }}>
+                      <span style={{ color: '#c2c6d6', fontWeight: 600 }}>{t.sym}</span>
+                      <span style={{ color: t.loaded ? (t.up >= 0 ? '#4edea3' : '#f87171') : '#8c909f' }}>
+                        {t.loaded ? (t.up >= 0 ? '+' : '') + t.up.toFixed(1) + '%' : '—'}
+                      </span>
+                    </span>
                   ))}
                 </div>
               </div>
@@ -300,11 +364,7 @@ export default function Home() {
                     <div key={h} style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em' }}>{h}</div>
                   ))}
                 </div>
-                {[
-                  { sym: 'NVDA', name: 'NVIDIA Corp', p: '$1,232', up: '+14.2%', sig: 'OPPORTUNITY', sc: '#4edea3' },
-                  { sym: 'AMD', name: 'Adv. Micro Dev.', p: '$168', up: '+11.8%', sig: 'STABLE', sc: '#adc6ff' },
-                  { sym: 'TSLA', name: 'Tesla Inc.', p: '$178', up: '-2.4%', sig: 'REVIEW', sc: '#8c909f' },
-                ].map(({ sym, name, p, up, sig, sc }) => (
+                {heroTableRows.map(({ sym, name, p, up, sig, sc }: { sym: string; name: string; p: string; up: string; sig: string; sc: string }) => (
                   <div key={sym} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 80px 80px 100px', gap: 0, padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
                     <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e2e2' }}>{sym}</span>
                     <span style={{ fontSize: 12, color: '#8c909f', fontFamily: 'Inter, system-ui, sans-serif' }}>{name}</span>
@@ -321,7 +381,7 @@ export default function Home() {
                 Company Explorer
               </h2>
               <p style={{ fontSize: 15, color: '#8c909f', lineHeight: 1.65, marginBottom: 24 }}>
-                Dive into a high-density environment for surgical analysis. Track sector rotation, AI-identified opportunities, and systematic risks across all 528 constituent nodes.
+                Dive into a high-density environment for surgical analysis. Track sector rotation, AI-identified opportunities, and systematic risks across all {companies.length || '—'} constituent nodes.
               </p>
               <button onClick={() => setActiveTab('explorer')}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#adc6ff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0 }}>
@@ -401,12 +461,7 @@ export default function Home() {
             </p>
             {/* Sector mini-stats grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 32 }}>
-              {[
-                { label: 'Technology', upside: '+8.42%', vol: '18.5%', pos: true },
-                { label: 'Healthcare', upside: '+4.2%', vol: '14.2%', pos: true },
-                { label: 'Energy', upside: '-1.8%', vol: '22.1%', pos: false },
-                { label: 'Utilities', upside: '-0.2%', vol: '12.8%', pos: false },
-              ].map(({ label, upside, vol, pos }) => (
+              {heroSectors.map(({ label, upside, vol, pos }) => (
                 <div key={label} onClick={() => setActiveTab('sector')}
                   style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '18px 20px', cursor: 'pointer', transition: 'border-color 0.2s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(173,198,255,0.25)'}
