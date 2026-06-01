@@ -111,11 +111,21 @@ export default function WatchlistDashboard({
     const neutralForecast  = watched.filter(c => c.forecast_signal === 'Neutral Forecast').length
     const negativeForecast = watched.filter(c => c.forecast_signal === 'Negative Forecast').length
 
-    const lowRisk  = watched.filter(c => c.risk_level === 'Lower Risk').length
-    const modRisk  = watched.filter(c => c.risk_level === 'Moderate Risk').length
-    const highRisk = watched.filter(c => c.risk_level === 'High Risk').length
+    // Normalise risk labels: the CSV may use "Low Risk", "Lower Risk",
+    // "Medium Risk", "Moderate Risk", or "High Risk".
+    const riskBucket = (r: string) => {
+      const v = (r ?? '').trim().toLowerCase()
+      if (v === 'low risk'  || v === 'lower risk')    return 'low'
+      if (v === 'medium risk' || v === 'moderate risk') return 'mod'
+      if (v === 'high risk')                           return 'high'
+      return 'unknown'
+    }
+    const lowRisk     = watched.filter(c => riskBucket(c.risk_level) === 'low').length
+    const modRisk     = watched.filter(c => riskBucket(c.risk_level) === 'mod').length
+    const highRisk    = watched.filter(c => riskBucket(c.risk_level) === 'high').length
+    const unknownRisk = watched.filter(c => riskBucket(c.risk_level) === 'unknown').length
 
-    return { avgUp, avgVol, best, mostVol, positiveForecast, neutralForecast, negativeForecast, lowRisk, modRisk, highRisk }
+    return { avgUp, avgVol, best, mostVol, positiveForecast, neutralForecast, negativeForecast, lowRisk, modRisk, highRisk, unknownRisk }
   }, [watched])
 
   // ── Sector exposure ───────────────────────────────────────────────────────
@@ -328,9 +338,12 @@ export default function WatchlistDashboard({
             }}>Risk Mix</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {[
-                { label: 'LOW', count: kpis.lowRisk,  color: D.teal },
-                { label: 'MOD', count: kpis.modRisk,  color: D.orange },
-                { label: 'HIGH', count: kpis.highRisk, color: D.red },
+                { label: 'LOW',  count: kpis.lowRisk,     color: D.teal },
+                { label: 'MOD',  count: kpis.modRisk,     color: D.orange },
+                { label: 'HIGH', count: kpis.highRisk,    color: D.red },
+                ...(kpis.unknownRisk > 0
+                  ? [{ label: 'UNK', count: kpis.unknownRisk, color: D.textMuted }]
+                  : []),
               ].map(({ label, count, color }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 9, fontFamily: D.mono, color, width: 28, letterSpacing: '0.05em' }}>{label}</span>
