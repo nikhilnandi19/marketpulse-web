@@ -3,15 +3,24 @@
 import { useState, useMemo, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { TrendingUp, AlertTriangle, Eye, Clock, BarChart2, Activity } from 'lucide-react'
-import type { CompanySummary, SectorSummary, KPIs, ModelErrorBand } from '@/lib/types'
+import type {
+  CompanySummary, SectorSummary, KPIs, ModelErrorBand,
+  SignalSnapshot, SignalPerformanceSummary,
+} from '@/lib/types'
 import { formatPercent, getSignalColor } from '@/lib/formatters'
 import { loadModelErrorBands } from '@/lib/data'
+import DailyBriefing from './DailyBriefing'
 
 interface Props {
   companies: CompanySummary[]
   sectors: SectorSummary[]
   kpis: KPIs | null
   onNavigateToExplorer?: (sector?: string, signal?: string) => void
+  /** Pass from page.tsx to power the Daily Briefing */
+  watchedSymbols?: string[]
+  signalSnapshots?: SignalSnapshot[]
+  signalSummary?: SignalPerformanceSummary[]
+  onNavigateToWatchlist?: () => void
 }
 
 const ALL = 'All'
@@ -50,7 +59,10 @@ const MAPE_BAND_COLORS: Record<string, string> = {
   'Higher Error':             S.negative,
 }
 
-export default function ExecutiveOverview({ companies, sectors, kpis, onNavigateToExplorer }: Props) {
+export default function ExecutiveOverview({
+  companies, sectors, kpis, onNavigateToExplorer,
+  watchedSymbols, signalSnapshots, signalSummary, onNavigateToWatchlist,
+}: Props) {
   const [filterSector, setFilterSector] = useState(ALL)
   const [filterSignal, setFilterSignal] = useState(ALL)
   const [filterRisk, setFilterRisk] = useState(ALL)
@@ -133,6 +145,17 @@ export default function ExecutiveOverview({ companies, sectors, kpis, onNavigate
           Adaptive momentum forecasts and model reliability scores deliver institutional-grade screening clarity.
         </p>
       </section>
+
+      {/* ── Daily Briefing ───────────────────────────────────────────────── */}
+      <DailyBriefing
+        companies={companies}
+        sectors={sectors}
+        signalSnapshots={signalSnapshots}
+        signalSummary={signalSummary}
+        watchedSymbols={watchedSymbols}
+        onNavigateToExplorer={onNavigateToExplorer}
+        onNavigateToWatchlist={onNavigateToWatchlist}
+      />
 
       {/* ── Command bar (filters) ─────────────────────────────────────────── */}
       <section style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 48, paddingBlock: 12, borderTop: `1px solid ${S.border}`, borderBottom: `1px solid ${S.border}` }}>

@@ -641,7 +641,18 @@ export default function Home() {
             </div>
           ) : (
             <>
-              {activeTab === 'overview' && <ExecutiveOverview companies={companies} sectors={sectors} kpis={kpis} onNavigateToExplorer={navigateToExplorer} />}
+              {activeTab === 'overview' && (
+                <ExecutiveOverview
+                  companies={companies}
+                  sectors={sectors}
+                  kpis={kpis}
+                  onNavigateToExplorer={navigateToExplorer}
+                  watchedSymbols={watchedSymbols}
+                  signalSnapshots={signalSnapshots}
+                  signalSummary={signalSummary}
+                  onNavigateToWatchlist={() => switchTab('watchlist')}
+                />
+              )}
               {activeTab === 'explorer' && (
                 <CompanyExplorer
                   companies={companies}
