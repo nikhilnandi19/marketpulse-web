@@ -1,10 +1,19 @@
 # scripts/02_generate_forecast_csvs.py
 
 from pathlib import Path
+from typing import Optional
 import math
+import time
 
 import numpy as np
 import pandas as pd
+
+try:
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    import joblib
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
 
 
 PRICE_PATH = Path("data/live/sp500_prices_live.csv")
@@ -19,6 +28,16 @@ WEIGHTS_PATH = OUTPUT_DIR / "marketpulse_model_dynamic_weights.csv"
 
 FORECAST_HORIZON_DAYS = 30
 BACKTEST_DAYS = 90
+
+XGBOOST_MODEL_PATH = Path("data/live/xgb_model.joblib")
+
+# Features fed into the XGBoost model — derived purely from price history
+XGB_FEATURE_COLS = [
+    "ret_1d", "ret_5d", "ret_10d", "ret_21d", "ret_63d", "ret_252d",
+    "vol_21d", "vol_63d",
+    "ma_ratio_30d", "ma_ratio_90d",
+    "rsi_14",
+]
 
 
 MODEL_CONFIGS = [
@@ -173,6 +192,175 @@ def calculate_moving_average(close_values: np.ndarray, window: int = 30) -> floa
         return float(close_values[-1])
 
     return float(np.mean(recent_window))
+
+
+def compute_xgb_features(close_values: np.ndarray) -> Optional[dict]:
+    """
+    Build the XGBoost feature vector from a price-history array.
+    Returns None if there is insufficient history (< 65 bars).
+    """
+    n = len(close_values)
+    if n < 65:
+        return None
+
+    close = np.maximum(close_values, 1e-9).astype(float)
+    log_ret = np.diff(np.log(close))
+    latest = float(close[-1])
+
+    def _log_ret_n(days: int) -> float:
+        if n > days and close[-(days + 1)] > 0:
+            return float(math.log(latest / float(close[-(days + 1)])) / days)
+        return 0.0
+
+    if n > 252:
+        ret_252d = float(math.log(latest / float(close[-253])) / 252)
+    else:
+        ret_252d = float(math.log(latest / float(close[0])) / max(n - 1, 1))
+
+    vol_21d = float(np.std(log_ret[-21:])) if len(log_ret) >= 21 else 0.02
+    vol_63d = float(np.std(log_ret[-63:])) if len(log_ret) >= 63 else 0.02
+
+    ma_30 = float(np.mean(close[-30:])) if n >= 30 else float(np.mean(close))
+    ma_90 = float(np.mean(close[-90:])) if n >= 90 else float(np.mean(close))
+
+    # RSI-14 normalised to [0, 1]
+    if len(log_ret) >= 14:
+        gains = np.mean(np.maximum(log_ret[-14:], 0.0))
+        losses = np.mean(np.maximum(-log_ret[-14:], 0.0))
+        rsi_14 = float(gains / (gains + losses)) if (gains + losses) > 0 else 0.5
+    else:
+        rsi_14 = 0.5
+
+    return {
+        "ret_1d":       _log_ret_n(1),
+        "ret_5d":       _log_ret_n(5),
+        "ret_10d":      _log_ret_n(10),
+        "ret_21d":      _log_ret_n(21),
+        "ret_63d":      _log_ret_n(63),
+        "ret_252d":     ret_252d,
+        "vol_21d":      vol_21d,
+        "vol_63d":      vol_63d,
+        "ma_ratio_30d": latest / ma_30 if ma_30 > 0 else 1.0,
+        "ma_ratio_90d": latest / ma_90 if ma_90 > 0 else 1.0,
+        "rsi_14":       rsi_14,
+    }
+
+
+def train_xgboost(prices: pd.DataFrame):
+    """
+    Train a single cross-sectional XGBoost model that predicts the
+    30-trading-day forward log return for any S&P 500 stock.
+
+    Training samples are drawn from every symbol (sampled every 5 days
+    to keep volume manageable).  Labels are clipped at ±60 % to remove
+    data artefacts.
+    """
+    rows: list[dict] = []
+
+    for symbol, group in prices.groupby("symbol"):
+        group = group.sort_values("date").reset_index(drop=True)
+        close = group["close"].to_numpy(dtype=float)
+        n = len(close)
+
+        if n < 95:      # 65 history + 30 future minimum
+            continue
+
+        for i in range(64, n - 30, 5):     # step=5 to keep set manageable
+            current_price = close[i]
+            future_price  = close[i + 30]
+
+            if current_price <= 0 or future_price <= 0:
+                continue
+
+            target = math.log(future_price / current_price)
+            if abs(target) > 0.6:           # clip extreme / erroneous labels
+                continue
+
+            feats = compute_xgb_features(close[: i + 1])
+            if feats is None:
+                continue
+
+            row = feats.copy()
+            row["target"] = target
+            rows.append(row)
+
+    if len(rows) < 100:
+        print("  Insufficient XGBoost training data — skipping.")
+        return None
+
+    df = pd.DataFrame(rows)
+    X  = df[XGB_FEATURE_COLS].fillna(0.0).clip(-10.0, 10.0)
+    y  = df["target"]
+
+    print(f"  Training gradient-boosted model on {len(df):,} samples from {prices['symbol'].nunique()} symbols...")
+
+    model = HistGradientBoostingRegressor(
+        max_iter=400,
+        max_depth=4,
+        learning_rate=0.04,
+        min_samples_leaf=10,
+        l2_regularization=1.5,
+        random_state=42,
+    )
+    model.fit(X, y)
+    return model
+
+
+def get_xgboost_forecasts(prices: pd.DataFrame) -> dict:
+    """
+    Returns {symbol: predicted_30d_log_return}.
+
+    Loads a cached model if it was saved less than 23 hours ago;
+    otherwise retrains and caches.  Falls back to an empty dict
+    if XGBoost is unavailable or training fails.
+    """
+    if not XGBOOST_AVAILABLE:
+        print("  XGBoost not installed — run: pip install xgboost joblib")
+        return {}
+
+    model = None
+
+    if XGBOOST_MODEL_PATH.exists():
+        age_hours = (time.time() - XGBOOST_MODEL_PATH.stat().st_mtime) / 3600
+        if age_hours < 23:
+            try:
+                model = joblib.load(XGBOOST_MODEL_PATH)
+                print(f"  Loaded cached XGBoost model ({age_hours:.1f} h old).")
+            except Exception as e:
+                print(f"  Cache load failed ({e}); retraining.")
+                model = None
+
+    if model is None:
+        model = train_xgboost(prices)
+        if model is None:
+            return {}
+        XGBOOST_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(model, XGBOOST_MODEL_PATH)
+        print(f"  XGBoost model cached at {XGBOOST_MODEL_PATH}")
+
+    results: dict = {}
+
+    for symbol, group in prices.groupby("symbol"):
+        group = group.sort_values("date").reset_index(drop=True)
+        close = group["close"].to_numpy(dtype=float)
+
+        if len(close) < 65:
+            continue
+
+        feats = compute_xgb_features(close)
+        if feats is None:
+            continue
+
+        X_pred = pd.DataFrame([feats])[XGB_FEATURE_COLS].fillna(0.0).clip(-10.0, 10.0)
+
+        try:
+            log_ret = float(model.predict(X_pred)[0])
+            log_ret = float(np.clip(log_ret, -0.5, 0.5))   # safety clip
+            results[symbol] = log_ret
+        except Exception as e:
+            print(f"  XGBoost inference failed for {symbol}: {e}")
+
+    return results
 
 
 def get_company_meta(companies: pd.DataFrame) -> dict:
@@ -477,7 +665,28 @@ def build_dynamic_weights(backtest: pd.DataFrame) -> pd.DataFrame:
     return weights
 
 
-def build_future_forecast(prices: pd.DataFrame, weights: pd.DataFrame, company_meta: dict) -> pd.DataFrame:
+def _xgb_row(log_return_30d: Optional[float], latest_close: float, horizon: int, max_horizon: int) -> dict:
+    """
+    Produce the three XGBoost forecast columns for a given horizon.
+    The 30-day log return is interpolated linearly in log-space across horizons.
+    """
+    if log_return_30d is None:
+        return {
+            "forecast_xgboost_direct": np.nan,
+            "predicted_log_return_xgboost": np.nan,
+            "forecast_xgboost_direct_upside_pct": np.nan,
+        }
+    log_ret_h = log_return_30d * horizon / max_horizon
+    price_h   = latest_close * math.exp(log_ret_h)
+    upside_h  = (price_h - latest_close) / latest_close * 100
+    return {
+        "forecast_xgboost_direct": price_h,
+        "predicted_log_return_xgboost": log_ret_h,
+        "forecast_xgboost_direct_upside_pct": upside_h,
+    }
+
+
+def build_future_forecast(prices: pd.DataFrame, weights: pd.DataFrame, company_meta: dict, xgboost_forecasts: Optional[dict] = None) -> pd.DataFrame:
     rows = []
 
     weights_by_symbol = {
@@ -551,6 +760,9 @@ def build_future_forecast(prices: pd.DataFrame, weights: pd.DataFrame, company_m
             },
         )
 
+        # XGBoost Direct: predicted 30-day log return for this symbol
+        xgb_log_return_30d: Optional[float] = (xgboost_forecasts or {}).get(symbol)
+
         for horizon in range(1, FORECAST_HORIZON_DAYS + 1):
             damped_horizon = (1 - (0.94 ** horizon)) / (1 - 0.94)
 
@@ -597,11 +809,9 @@ def build_future_forecast(prices: pd.DataFrame, weights: pd.DataFrame, company_m
                     "forecast_lower_band": forecast_lower_band,
                     "forecast_upper_band": forecast_upper_band,
 
-                    # XGBoost is intentionally blank in this first local live pipeline version.
-                    # We will rebuild/persist XGBoost separately later.
-                    "forecast_xgboost_direct": np.nan,
-                    "predicted_log_return_xgboost": np.nan,
-                    "forecast_xgboost_direct_upside_pct": np.nan,
+                    # XGBoost Direct: interpolate log return linearly across the horizon
+                    # (log-space straight line from 0 → 30-day prediction)
+                    **_xgb_row(xgb_log_return_30d, latest_close, horizon, FORECAST_HORIZON_DAYS),
 
                     "weight_naive": weight_naive,
                     "weight_moving_average_30d": weight_moving_average_30d,
@@ -613,7 +823,11 @@ def build_future_forecast(prices: pd.DataFrame, weights: pd.DataFrame, company_m
                     "forecast_weighted_ensemble_upside_pct": (
                         (forecast_weighted_ensemble - latest_close) / latest_close * 100
                     ),
-                    "weighted_ensemble_method": "Constrained dynamic ensemble excluding XGBoost",
+                    "weighted_ensemble_method": (
+                        "Weighted Ensemble"
+                        if xgb_log_return_30d is not None
+                        else "Constrained dynamic ensemble excluding XGBoost"
+                    ),
                 }
             )
 
@@ -653,8 +867,12 @@ def main() -> None:
     print("Min weight sum:", round(float(weight_check.min()), 6))
     print("Max weight sum:", round(float(weight_check.max()), 6))
 
+    print("\nTraining / loading XGBoost model and computing 30-day forecasts...")
+    xgboost_forecasts = get_xgboost_forecasts(prices)
+    print(f"XGBoost forecasts ready for {len(xgboost_forecasts)} symbols.")
+
     print("\nBuilding 30-day future forecast...")
-    future = build_future_forecast(prices, weights, company_meta)
+    future = build_future_forecast(prices, weights, company_meta, xgboost_forecasts)
     future.to_csv(FUTURE_FORECAST_PATH, index=False)
 
     print("Future forecast saved:", FUTURE_FORECAST_PATH)
