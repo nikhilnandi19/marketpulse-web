@@ -152,9 +152,15 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
   const recentHistory = useMemo(() => avpData.slice(-60), [avpData])
 
   const combinedData = useMemo(() => {
-    const hist = recentHistory.map(r => ({
-      date: r.date, actual_price: r.actual_price, type: 'history' as const,
-    }))
+    // Exclude historical rows whose date overlaps with a forecast date.
+    // This prevents a non-monotonic x-axis when the backtest and forecast
+    // CSVs are from different pipeline runs (e.g. backtest newer than forecast).
+    const fcastDates = new Set(ffData.map(r => r.forecast_date))
+    const hist = recentHistory
+      .filter(r => !fcastDates.has(r.date))
+      .map(r => ({
+        date: r.date, actual_price: r.actual_price, type: 'history' as const,
+      }))
     const fcast = ffData.map(r => ({
       date: r.forecast_date,
       forecast_naive: r.forecast_naive,
@@ -236,7 +242,12 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
   }
   const handleZoomOut = () => setAvpZoom({ startIdx: 0, endIdx: -1 })
 
-  const splitDate = recentHistory[recentHistory.length - 1]?.date
+  // splitDate = last historical date that does NOT overlap with forecast dates
+  const splitDate = useMemo(() => {
+    const fcastDates = new Set(ffData.map(r => r.forecast_date))
+    const nonOverlapping = recentHistory.filter(r => !fcastDates.has(r.date))
+    return nonOverlapping[nonOverlapping.length - 1]?.date ?? recentHistory[recentHistory.length - 1]?.date
+  }, [recentHistory, ffData])
   const card = { background: D.card, border: `1px solid ${D.border}`, borderRadius: 8 }
 
   const filteredSymbols = symbols.filter(s => s.toLowerCase().includes(symbolSearch.toLowerCase()))
