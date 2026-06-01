@@ -685,7 +685,18 @@ export default function Home() {
                   byRisk={signalByRisk}
                 />
               )}
-              {activeTab === 'ai' && <AIAnalyst companies={companies} sectors={sectors} defaultCompany={selectedCompany} defaultQuestion={aiDefaultQuestion} />}
+              {activeTab === 'ai' && (
+                <AIAnalyst
+                  companies={companies}
+                  sectors={sectors}
+                  defaultCompany={selectedCompany}
+                  defaultQuestion={aiDefaultQuestion}
+                  watchedSymbols={watchedSymbols}
+                  onToggleWatchlist={toggleWatchlist}
+                  signalSnapshots={signalSnapshots}
+                  signalSummary={signalSummary}
+                />
+              )}
               {activeTab === 'learn' && <LearnTab onAskAI={navigateToAIWithQuestion} />}
             </>
           )}
