@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Activity, BarChart2, GitBranch, Globe, Crosshair, Bot, BookOpen, TrendingUp, Sparkles, AlertTriangle, ArrowUpRight, Info, Target } from 'lucide-react'
+import { Activity, BarChart2, GitBranch, Globe, Crosshair, Bot, BookOpen, TrendingUp, Sparkles, AlertTriangle, ArrowUpRight, Info, Target, Bookmark } from 'lucide-react'
 import ExecutiveOverview from '@/components/dashboard/ExecutiveOverview'
 import CompanyExplorer from '@/components/dashboard/CompanyExplorer'
 import ForecastPerformance from '@/components/dashboard/ForecastPerformance'
@@ -10,6 +10,8 @@ import RiskOpportunityMatrix from '@/components/dashboard/RiskOpportunityMatrix'
 import AIAnalyst from '@/components/dashboard/AIAnalyst'
 import LearnTab from '@/components/dashboard/LearnTab'
 import SignalPerformance from '@/components/dashboard/SignalPerformance'
+import WatchlistDashboard from '@/components/dashboard/WatchlistDashboard'
+import { useWatchlist } from '@/lib/useWatchlist'
 import {
   loadCompanySummary, loadSectorSummary, loadKPIs,
   loadActualVsPredicted, loadFutureForecast,
@@ -23,8 +25,9 @@ import type {
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Activity },
-  { id: 'explorer', label: 'Explorer', icon: BarChart2 },
-  { id: 'forecast', label: 'Forecast', icon: GitBranch },
+  { id: 'explorer',  label: 'Explorer',  icon: BarChart2 },
+  { id: 'watchlist', label: 'Watchlist',  icon: Bookmark },
+  { id: 'forecast',  label: 'Forecast',  icon: GitBranch },
   { id: 'sector', label: 'Sector', icon: Globe },
   { id: 'matrix', label: 'Risk Matrix', icon: Crosshair },
   { id: 'signals', label: 'Signal Performance', icon: Target },
@@ -91,7 +94,15 @@ function heroSignal(signal: string): { label: string; color: string } {
 }
 
 export default function Home() {
+  const { symbols: watchedSymbols, toggle: toggleWatchlist } = useWatchlist()
   const [activeTab, setActiveTab] = useState<string | null>(null)
+
+  // Switch tab and always scroll to the top of the page so the user
+  // starts at the top of the new tab, not wherever they scrolled to.
+  const switchTab = useCallback((tab: string | null) => {
+    setActiveTab(tab)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
   const [companies, setCompanies] = useState<CompanySummary[]>([])
   const [sectors, setSectors] = useState<SectorSummary[]>([])
   const [kpis, setKpis] = useState<KPIs | null>(null)
@@ -129,19 +140,19 @@ export default function Home() {
   const navigateToExplorer = useCallback((sector?: string, signal?: string) => {
     setExplorerSector(sector)
     setExplorerSignal(signal)
-    setActiveTab('explorer')
+    switchTab('explorer')
   }, [])
 
   const navigateToAIWithQuestion = useCallback((question: string) => {
     setAiDefaultQuestion(question)
-    setActiveTab('ai')
+    switchTab('ai')
   }, [])
 
   const navigateToForecast = useCallback((company: CompanySummary) => {
-    setSelectedCompany(company); setActiveTab('forecast')
+    setSelectedCompany(company); switchTab('forecast')
   }, [])
   const navigateToAI = useCallback((company: CompanySummary) => {
-    setSelectedCompany(company); setActiveTab('ai')
+    setSelectedCompany(company); switchTab('ai')
   }, [])
 
   // Hero preview data — derived from real companies, updates automatically with data
@@ -227,7 +238,7 @@ export default function Home() {
         <nav className="flex justify-between items-center w-full px-4 md:px-16 max-w-[1440px] mx-auto" style={{ height: 80 }}>
           {/* Logo + nav links */}
           <div className="flex items-center gap-8">
-            <button onClick={() => setActiveTab(null)}
+            <button onClick={() => switchTab(null)}
               className="flex items-center gap-2 font-bold tracking-tight" style={{ fontSize: 20, color: '#e0e3e5' }}>
               MarketPulse
               <span style={{
@@ -243,7 +254,7 @@ export default function Home() {
               {TABS.map(tab => {
                 const active = activeTab === tab.id
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  <button key={tab.id} onClick={() => switchTab(tab.id)}
                     style={{
                       fontSize: 12, fontWeight: active ? 700 : 400, letterSpacing: '0.05em',
                       color: active ? '#d0bcff' : '#cbc3d7',
@@ -259,15 +270,7 @@ export default function Home() {
 
           {/* Right side */}
           <div className="flex items-center gap-4">
-            <span className="hidden md:inline-flex items-center px-4 py-1.5 rounded-full text-xs font-medium"
-              style={{
-                background: 'rgba(30,32,34,0.40)', backdropFilter: 'blur(40px)',
-                border: '1px solid rgba(255,255,255,0.08)', color: '#e0e3e5',
-                letterSpacing: '0.05em',
-              }}>
-              Educational only
-            </span>
-            <button onClick={() => setActiveTab('overview')}
+            <button onClick={() => switchTab('overview')}
               className="px-6 py-2.5 rounded-full font-bold text-xs active:scale-95 transition-all hover:opacity-80"
               style={{
                 background: '#d0bcff', color: '#3c0091',
@@ -286,7 +289,7 @@ export default function Home() {
             const Icon = tab.icon
             const active = activeTab === tab.id
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => switchTab(tab.id)}
                 className="flex items-center gap-1 px-3 py-2 text-xs whitespace-nowrap shrink-0"
                 style={{ color: active ? '#d0bcff' : '#cbc3d7', borderBottom: active ? '2px solid #d0bcff' : '2px solid transparent' }}>
                 <Icon size={11} /> {tab.label}
@@ -313,11 +316,11 @@ export default function Home() {
               </p>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <button onClick={() => setActiveTab('overview')}
+                <button onClick={() => switchTab('overview')}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#adc6ff', color: '#002e6a', fontSize: 14, fontWeight: 600, padding: '12px 24px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif' }}>
                   Launch Dashboard <ArrowUpRight size={14} />
                 </button>
-                <button onClick={() => setActiveTab('learn')}
+                <button onClick={() => switchTab('learn')}
                   style={{ fontSize: 14, fontWeight: 500, color: '#c2c6d6', background: 'transparent', padding: '12px 24px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif' }}>
                   Technical Specs
                 </button>
@@ -401,7 +404,7 @@ export default function Home() {
               <p style={{ fontSize: 15, color: '#8c909f', lineHeight: 1.65, marginBottom: 24 }}>
                 Dive into a high-density environment for surgical analysis. Track sector rotation, AI-identified opportunities, and systematic risks across all {companies.length || '—'} constituent nodes.
               </p>
-              <button onClick={() => setActiveTab('explorer')}
+              <button onClick={() => switchTab('explorer')}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#adc6ff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0 }}>
                 Explore Company Explorer <ArrowUpRight size={14} />
               </button>
@@ -433,7 +436,7 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setActiveTab('forecast')}
+              <button onClick={() => switchTab('forecast')}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#d0bcff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0 }}>
                 Explore Forecast Performance <ArrowUpRight size={14} />
               </button>
@@ -480,7 +483,7 @@ export default function Home() {
             {/* Sector mini-stats grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 32 }}>
               {heroSectors.map(({ label, upside, vol, pos }) => (
-                <div key={label} onClick={() => setActiveTab('sector')}
+                <div key={label} onClick={() => switchTab('sector')}
                   style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '18px 20px', cursor: 'pointer', transition: 'border-color 0.2s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(173,198,255,0.25)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'}>
@@ -491,7 +494,7 @@ export default function Home() {
               ))}
             </div>
             <div style={{ textAlign: 'center' }}>
-              <button onClick={() => setActiveTab('sector')}
+              <button onClick={() => switchTab('sector')}
                 style={{ fontSize: 14, color: '#4edea3', background: '#1a1c1c', border: '1px solid rgba(78,222,163,0.25)', padding: '10px 24px', borderRadius: 6, cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500 }}>
                 Explore Sector Comparison
               </button>
@@ -517,7 +520,7 @@ export default function Home() {
                 <text x="148" y="14" fontSize="8" fill="#8c909f" fontFamily="JetBrains Mono">HIGH UPSIDE / LOW VOL</text>
                 <text x="4" y="155" fontSize="8" fill="#8c909f" fontFamily="JetBrains Mono">LOW UPSIDE / HIGH VOL</text>
               </svg>
-              <button onClick={() => setActiveTab('matrix')}
+              <button onClick={() => switchTab('matrix')}
                 style={{ fontSize: 13, color: '#fb923c', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                 Explore Risk Matrix <ArrowUpRight size={13} />
               </button>
@@ -538,7 +541,7 @@ export default function Home() {
                   <div><div style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Confidence</div><div style={{ fontSize: 14, fontWeight: 600, color: '#adc6ff', fontFamily: 'Inter' }}>94.2%</div></div>
                 </div>
               </div>
-              <button onClick={() => setActiveTab('ai')}
+              <button onClick={() => switchTab('ai')}
                 style={{ fontSize: 13, color: '#d0bcff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                 Explore MarketPulse AI <ArrowUpRight size={13} />
               </button>
@@ -562,13 +565,13 @@ export default function Home() {
                 { label: 'Model Methodology', icon: '◎' },
                 { label: 'Data Governance', icon: '⚙' },
               ].map(({ label, icon }) => (
-                <button key={label} onClick={() => setActiveTab('learn')}
+                <button key={label} onClick={() => switchTab('learn')}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c2c6d6', background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 20px', borderRadius: 6, cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif' }}>
                   <span style={{ color: '#adc6ff' }}>{icon}</span> {label}
                 </button>
               ))}
             </div>
-            <button onClick={() => setActiveTab('learn')}
+            <button onClick={() => switchTab('learn')}
               style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e2', background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.15)', padding: '12px 28px', borderRadius: 6, cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif' }}>
               Explore Learn Hub
             </button>
@@ -604,14 +607,15 @@ export default function Home() {
               <div className="flex flex-wrap gap-6 items-center">
                 {[
                   { label: 'Overview', tab: 'overview' },
-                  { label: 'Explorer', tab: 'explorer' },
-                  { label: 'Forecast', tab: 'forecast' },
+                  { label: 'Explorer',  tab: 'explorer' },
+                  { label: 'Watchlist', tab: 'watchlist' },
+                  { label: 'Forecast',  tab: 'forecast' },
                   { label: 'Risk Matrix', tab: 'matrix' },
                   { label: 'Signal Performance', tab: 'signals' },
                   { label: 'AI Analyst', tab: 'ai' },
                   { label: 'Learn', tab: 'learn' },
                 ].map(({ label, tab }) => (
-                  <button key={label} onClick={() => setActiveTab(tab)}
+                  <button key={label} onClick={() => switchTab(tab)}
                     className="transition-colors hover:text-white"
                     style={{ fontSize: 12, letterSpacing: '0.05em', color: '#cbc3d7' }}>
                     {label}
@@ -638,7 +642,27 @@ export default function Home() {
           ) : (
             <>
               {activeTab === 'overview' && <ExecutiveOverview companies={companies} sectors={sectors} kpis={kpis} onNavigateToExplorer={navigateToExplorer} />}
-              {activeTab === 'explorer' && <CompanyExplorer companies={companies} onViewForecast={navigateToForecast} onViewAI={navigateToAI} initialSector={explorerSector} initialSignal={explorerSignal} />}
+              {activeTab === 'explorer' && (
+                <CompanyExplorer
+                  companies={companies}
+                  onViewForecast={navigateToForecast}
+                  onViewAI={navigateToAI}
+                  initialSector={explorerSector}
+                  initialSignal={explorerSignal}
+                  watchedSymbols={watchedSymbols}
+                  onToggleWatchlist={toggleWatchlist}
+                />
+              )}
+              {activeTab === 'watchlist' && (
+                <WatchlistDashboard
+                  companies={companies}
+                  watchedSymbols={watchedSymbols}
+                  onToggleWatchlist={toggleWatchlist}
+                  onViewForecast={navigateToForecast}
+                  onViewAI={navigateToAI}
+                  onNavigateToExplorer={() => switchTab('explorer')}
+                />
+              )}
               {activeTab === 'forecast' && <ForecastPerformance companies={companies} actualVsPredicted={actualVsPredicted} futureForecast={futureForecast} defaultSymbol={selectedCompany?.symbol} />}
               {activeTab === 'sector' && <SectorComparison sectors={sectors} onNavigateToExplorer={navigateToExplorer} />}
               {activeTab === 'matrix' && <RiskOpportunityMatrix companies={companies} onSelectCompany={navigateToForecast} />}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Search, GitBranch, Bot, RotateCcw } from 'lucide-react'
+import { Search, GitBranch, Bot, RotateCcw, Bookmark } from 'lucide-react'
 import type { CompanySummary } from '@/lib/types'
 import { formatCurrency, getSignalColor } from '@/lib/formatters'
 
@@ -11,6 +11,10 @@ interface Props {
   onViewAI: (c: CompanySummary) => void
   initialSector?: string
   initialSignal?: string
+  /** Symbols currently in the user's watchlist (from useWatchlist). */
+  watchedSymbols?: string[]
+  /** Called when the user clicks the bookmark toggle for a row. */
+  onToggleWatchlist?: (symbol: string) => void
 }
 
 type SortKey = keyof CompanySummary
@@ -103,7 +107,10 @@ function TickerTape({ companies }: { companies: CompanySummary[] }) {
   )
 }
 
-export default function CompanyExplorer({ companies, onViewForecast, onViewAI, initialSector, initialSignal }: Props) {
+export default function CompanyExplorer({
+  companies, onViewForecast, onViewAI, initialSector, initialSignal,
+  watchedSymbols = [], onToggleWatchlist,
+}: Props) {
   const [search, setSearch]         = useState('')
   const [filterSector, setFilterSector] = useState(initialSector ?? ALL)
   const [filterSignal, setFilterSignal] = useState(initialSignal ?? ALL)
@@ -299,6 +306,7 @@ export default function CompanyExplorer({ companies, onViewForecast, onViewAI, i
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr>
                 <th style={{ ...thStyle, paddingLeft: 18 }}>ACT</th>
+                <th style={{ ...thStyle, width: 30 }}>WL</th>
                 <th style={thStyle} onClick={() => handleSort('symbol')}>Ticker <SortArrow col="symbol" /></th>
                 <th style={thStyle} onClick={() => handleSort('company_name')}>Name <SortArrow col="company_name" /></th>
                 <th style={thStyle} onClick={() => handleSort('latest_price')}>Price <SortArrow col="latest_price" /></th>
@@ -335,6 +343,31 @@ export default function CompanyExplorer({ companies, onViewForecast, onViewAI, i
                           <Bot size={9} />
                         </button>
                       </div>
+                    </td>
+
+                    {/* Watchlist bookmark toggle */}
+                    <td style={{ padding: '11px 8px', whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const watched = watchedSymbols.includes(c.symbol)
+                        return (
+                          <button
+                            onClick={e => { e.stopPropagation(); onToggleWatchlist?.(c.symbol) }}
+                            title={watched ? `Remove ${c.symbol} from watchlist` : `Add ${c.symbol} to watchlist`}
+                            aria-label={watched ? `Remove ${c.symbol} from watchlist` : `Add ${c.symbol} to watchlist`}
+                            style={{
+                              width: 24, height: 21, borderRadius: 2,
+                              border: watched ? '1px solid rgba(208,188,255,0.40)' : `1px solid ${D.border}`,
+                              background: watched ? 'rgba(208,188,255,0.12)' : D.container,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: onToggleWatchlist ? 'pointer' : 'default',
+                              color: watched ? D.secondary : D.textMuted,
+                              transition: 'color 0.15s, background 0.15s, border-color 0.15s',
+                            }}
+                          >
+                            <Bookmark size={9} fill={watched ? D.secondary : 'none'} />
+                          </button>
+                        )
+                      })()}
                     </td>
 
                     <td style={{ padding: '11px 14px', fontSize: 14, fontWeight: 700, color: D.text, fontFamily: D.mono, whiteSpace: 'nowrap' }}>{c.symbol}</td>
@@ -375,7 +408,7 @@ export default function CompanyExplorer({ companies, onViewForecast, onViewAI, i
                 )
               })}
               {!paginated.length && (
-                <tr><td colSpan={10} style={{ padding: 48, textAlign: 'center', color: D.textMuted, fontSize: 13, fontFamily: D.mono }}>
+                <tr><td colSpan={11} style={{ padding: 48, textAlign: 'center', color: D.textMuted, fontSize: 13, fontFamily: D.mono }}>
                   No companies match your filters.
                 </td></tr>
               )}
