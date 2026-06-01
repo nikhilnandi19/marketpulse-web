@@ -5,6 +5,10 @@ import type {
   FutureForecast,
   KPIs,
   ModelErrorBand,
+  SignalSnapshot,
+  SignalPerformanceSummary,
+  SignalPerformanceBySector,
+  SignalPerformanceByRisk,
 } from './types'
 
 /**
@@ -305,6 +309,95 @@ export async function loadModelErrorBands(): Promise<ModelErrorBand[]> {
     })
   )
   return data.sort((a, b) => a.model_error_band_order - b.model_error_band_order)
+}
+
+// ─── Signal Accountability loaders ───────────────────────────────────────────
+
+/** Returns [] if the file is missing or empty — never throws. */
+export async function loadSignalSnapshots(): Promise<SignalSnapshot[]> {
+  return fetchCSV<SignalSnapshot>(
+    '/data/marketpulse_signal_snapshots.csv',
+    (r) => ({
+      snapshot_date:            r.snapshot_date || '',
+      symbol:                   r.symbol || '',
+      company_name:             r.company_name || '',
+      sector:                   r.sector || '',
+      industry:                 r.industry || '',
+      latest_close:             parseNum(r.latest_close),
+      forecast_30d_price:       parseNum(r.forecast_30d_price),
+      forecast_30d_upside_pct:  parseNum(r.forecast_30d_upside_pct),
+      forecast_signal:          r.forecast_signal || '',
+      final_signal:             r.final_signal || '',
+      investment_signal:        r.investment_signal || '',
+      risk_level:               r.risk_level || '',
+      model_reliability:        r.model_reliability || '',
+      annualized_volatility_pct: parseNum(r.annualized_volatility_pct),
+      best_model_mape:          parseNum(r.best_model_mape),
+      dashboard_forecast_method: r.dashboard_forecast_method || '',
+      return_5d_pct:            parseNum(r.return_5d_pct),
+      return_10d_pct:           parseNum(r.return_10d_pct),
+      return_30d_pct:           parseNum(r.return_30d_pct),
+      direction_correct_5d:     parseNum(r.direction_correct_5d),
+      direction_correct_10d:    parseNum(r.direction_correct_10d),
+      direction_correct_30d:    parseNum(r.direction_correct_30d),
+      hit_5d:                   parseNum(r.hit_5d),
+      hit_10d:                  parseNum(r.hit_10d),
+      hit_30d:                  parseNum(r.hit_30d),
+      outcome_status:           r.outcome_status || 'pending',
+    })
+  )
+}
+
+export async function loadSignalPerformanceSummary(): Promise<SignalPerformanceSummary[]> {
+  return fetchCSV<SignalPerformanceSummary>(
+    '/data/marketpulse_signal_performance_summary.csv',
+    (r) => ({
+      signal_category:              r.signal_category || '',
+      snapshot_count:               parseNum(r.snapshot_count) ?? 0,
+      pending_count:                parseNum(r.pending_count) ?? 0,
+      partial_count:                parseNum(r.partial_count) ?? 0,
+      complete_count:               parseNum(r.complete_count) ?? 0,
+      avg_forecast_30d_upside_pct:  parseNum(r.avg_forecast_30d_upside_pct),
+      avg_return_5d_pct:            parseNum(r.avg_return_5d_pct),
+      avg_return_10d_pct:           parseNum(r.avg_return_10d_pct),
+      avg_return_30d_pct:           parseNum(r.avg_return_30d_pct),
+      hit_rate_5d_pct:              parseNum(r.hit_rate_5d_pct),
+      hit_rate_10d_pct:             parseNum(r.hit_rate_10d_pct),
+      hit_rate_30d_pct:             parseNum(r.hit_rate_30d_pct),
+    })
+  )
+}
+
+export async function loadSignalPerformanceBySector(): Promise<SignalPerformanceBySector[]> {
+  return fetchCSV<SignalPerformanceBySector>(
+    '/data/marketpulse_signal_performance_by_sector.csv',
+    (r) => ({
+      sector:                       r.sector || '',
+      snapshot_count:               parseNum(r.snapshot_count) ?? 0,
+      complete_count:               parseNum(r.complete_count) ?? 0,
+      avg_forecast_30d_upside_pct:  parseNum(r.avg_forecast_30d_upside_pct),
+      avg_return_5d_pct:            parseNum(r.avg_return_5d_pct),
+      avg_return_10d_pct:           parseNum(r.avg_return_10d_pct),
+      avg_return_30d_pct:           parseNum(r.avg_return_30d_pct),
+      hit_rate_30d_pct:             parseNum(r.hit_rate_30d_pct),
+    })
+  )
+}
+
+export async function loadSignalPerformanceByRisk(): Promise<SignalPerformanceByRisk[]> {
+  return fetchCSV<SignalPerformanceByRisk>(
+    '/data/marketpulse_signal_performance_by_risk.csv',
+    (r) => ({
+      risk_level:                   r.risk_level || '',
+      snapshot_count:               parseNum(r.snapshot_count) ?? 0,
+      complete_count:               parseNum(r.complete_count) ?? 0,
+      avg_forecast_30d_upside_pct:  parseNum(r.avg_forecast_30d_upside_pct),
+      avg_return_5d_pct:            parseNum(r.avg_return_5d_pct),
+      avg_return_10d_pct:           parseNum(r.avg_return_10d_pct),
+      avg_return_30d_pct:           parseNum(r.avg_return_30d_pct),
+      hit_rate_30d_pct:             parseNum(r.hit_rate_30d_pct),
+    })
+  )
 }
 
 // ─── Sample fallback data ─────────────────────────────────────────────────────

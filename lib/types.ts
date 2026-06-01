@@ -131,3 +131,71 @@ export interface ModelErrorBand {
   model_error_band_order: number
   company_count: number
 }
+
+// ─── Signal Accountability types ─────────────────────────────────────────────
+
+export interface SignalSnapshot {
+  snapshot_date: string
+  symbol: string
+  company_name: string
+  sector: string
+  industry: string
+  latest_close: number | null
+  forecast_30d_price: number | null
+  forecast_30d_upside_pct: number | null
+  forecast_signal: string
+  final_signal: string
+  investment_signal: string
+  risk_level: string
+  model_reliability: string
+  annualized_volatility_pct: number | null
+  best_model_mape: number | null
+  dashboard_forecast_method: string
+  return_5d_pct: number | null
+  return_10d_pct: number | null
+  return_30d_pct: number | null
+  direction_correct_5d: number | null
+  direction_correct_10d: number | null
+  direction_correct_30d: number | null
+  hit_5d: number | null
+  hit_10d: number | null
+  hit_30d: number | null
+  outcome_status: string
+}
+
+export interface SignalPerformanceSummary {
+  signal_category: string
+  snapshot_count: number
+  pending_count: number
+  partial_count: number
+  complete_count: number
+  avg_forecast_30d_upside_pct: number | null
+  avg_return_5d_pct: number | null
+  avg_return_10d_pct: number | null
+  avg_return_30d_pct: number | null
+  hit_rate_5d_pct: number | null
+  hit_rate_10d_pct: number | null
+  hit_rate_30d_pct: number | null
+}
+
+export interface SignalPerformanceBySector {
+  sector: string
+  snapshot_count: number
+  complete_count: number
+  avg_forecast_30d_upside_pct: number | null
+  avg_return_5d_pct: number | null
+  avg_return_10d_pct: number | null
+  avg_return_30d_pct: number | null
+  hit_rate_30d_pct: number | null
+}
+
+export interface SignalPerformanceByRisk {
+  risk_level: string
+  snapshot_count: number
+  complete_count: number
+  avg_forecast_30d_upside_pct: number | null
+  avg_return_5d_pct: number | null
+  avg_return_10d_pct: number | null
+  avg_return_30d_pct: number | null
+  hit_rate_30d_pct: number | null
+}

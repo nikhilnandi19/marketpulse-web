@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Activity, BarChart2, GitBranch, Globe, Crosshair, Bot, BookOpen, TrendingUp, Sparkles, AlertTriangle, ArrowUpRight, Info } from 'lucide-react'
+import { Activity, BarChart2, GitBranch, Globe, Crosshair, Bot, BookOpen, TrendingUp, Sparkles, AlertTriangle, ArrowUpRight, Info, Target } from 'lucide-react'
 import ExecutiveOverview from '@/components/dashboard/ExecutiveOverview'
 import CompanyExplorer from '@/components/dashboard/CompanyExplorer'
 import ForecastPerformance from '@/components/dashboard/ForecastPerformance'
@@ -9,8 +9,17 @@ import SectorComparison from '@/components/dashboard/SectorComparison'
 import RiskOpportunityMatrix from '@/components/dashboard/RiskOpportunityMatrix'
 import AIAnalyst from '@/components/dashboard/AIAnalyst'
 import LearnTab from '@/components/dashboard/LearnTab'
-import { loadCompanySummary, loadSectorSummary, loadKPIs, loadActualVsPredicted, loadFutureForecast } from '@/lib/data'
-import type { CompanySummary, SectorSummary, KPIs, ActualVsPredicted, FutureForecast } from '@/lib/types'
+import SignalPerformance from '@/components/dashboard/SignalPerformance'
+import {
+  loadCompanySummary, loadSectorSummary, loadKPIs,
+  loadActualVsPredicted, loadFutureForecast,
+  loadSignalSnapshots, loadSignalPerformanceSummary,
+  loadSignalPerformanceBySector, loadSignalPerformanceByRisk,
+} from '@/lib/data'
+import type {
+  CompanySummary, SectorSummary, KPIs, ActualVsPredicted, FutureForecast,
+  SignalSnapshot, SignalPerformanceSummary, SignalPerformanceBySector, SignalPerformanceByRisk,
+} from '@/lib/types'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Activity },
@@ -18,6 +27,7 @@ const TABS = [
   { id: 'forecast', label: 'Forecast', icon: GitBranch },
   { id: 'sector', label: 'Sector', icon: Globe },
   { id: 'matrix', label: 'Risk Matrix', icon: Crosshair },
+  { id: 'signals', label: 'Signal Performance', icon: Target },
   { id: 'ai', label: 'MarketPulse AI', icon: Bot },
   { id: 'learn', label: 'Learn', icon: BookOpen },
 ]
@@ -87,6 +97,10 @@ export default function Home() {
   const [kpis, setKpis] = useState<KPIs | null>(null)
   const [actualVsPredicted, setActualVsPredicted] = useState<ActualVsPredicted[]>([])
   const [futureForecast, setFutureForecast] = useState<FutureForecast[]>([])
+  const [signalSnapshots, setSignalSnapshots] = useState<SignalSnapshot[]>([])
+  const [signalSummary, setSignalSummary] = useState<SignalPerformanceSummary[]>([])
+  const [signalBySector, setSignalBySector] = useState<SignalPerformanceBySector[]>([])
+  const [signalByRisk, setSignalByRisk] = useState<SignalPerformanceByRisk[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCompany, setSelectedCompany] = useState<CompanySummary | null>(null)
   const [explorerSector, setExplorerSector] = useState<string | undefined>(undefined)
@@ -97,12 +111,16 @@ export default function Home() {
 
   useEffect(() => {
     async function loadAll() {
-      const [c, s, k, avp, ff] = await Promise.all([
+      const [c, s, k, avp, ff, ss, ssumm, sbyS, sbyR] = await Promise.all([
         loadCompanySummary(), loadSectorSummary(), loadKPIs(),
         loadActualVsPredicted(), loadFutureForecast(),
+        loadSignalSnapshots(), loadSignalPerformanceSummary(),
+        loadSignalPerformanceBySector(), loadSignalPerformanceByRisk(),
       ])
       setCompanies(c); setSectors(s); setKpis(k)
       setActualVsPredicted(avp); setFutureForecast(ff)
+      setSignalSnapshots(ss); setSignalSummary(ssumm)
+      setSignalBySector(sbyS); setSignalByRisk(sbyR)
       setLoading(false)
     }
     loadAll()
@@ -589,6 +607,7 @@ export default function Home() {
                   { label: 'Explorer', tab: 'explorer' },
                   { label: 'Forecast', tab: 'forecast' },
                   { label: 'Risk Matrix', tab: 'matrix' },
+                  { label: 'Signal Performance', tab: 'signals' },
                   { label: 'AI Analyst', tab: 'ai' },
                   { label: 'Learn', tab: 'learn' },
                 ].map(({ label, tab }) => (
@@ -623,6 +642,14 @@ export default function Home() {
               {activeTab === 'forecast' && <ForecastPerformance companies={companies} actualVsPredicted={actualVsPredicted} futureForecast={futureForecast} defaultSymbol={selectedCompany?.symbol} />}
               {activeTab === 'sector' && <SectorComparison sectors={sectors} onNavigateToExplorer={navigateToExplorer} />}
               {activeTab === 'matrix' && <RiskOpportunityMatrix companies={companies} onSelectCompany={navigateToForecast} />}
+              {activeTab === 'signals' && (
+                <SignalPerformance
+                  snapshots={signalSnapshots}
+                  summary={signalSummary}
+                  bySector={signalBySector}
+                  byRisk={signalByRisk}
+                />
+              )}
               {activeTab === 'ai' && <AIAnalyst companies={companies} sectors={sectors} defaultCompany={selectedCompany} defaultQuestion={aiDefaultQuestion} />}
               {activeTab === 'learn' && <LearnTab onAskAI={navigateToAIWithQuestion} />}
             </>
