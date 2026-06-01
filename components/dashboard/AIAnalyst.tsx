@@ -1,17 +1,39 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { Sparkles, Search, AlertTriangle, X, TrendingUp, BarChart2, Paperclip, ArrowRight, Filter } from 'lucide-react'
-import type { CompanySummary, SectorSummary } from '@/lib/types'
-import { formatPercent, formatCurrency, formatCompactNumber } from '@/lib/formatters'
+import type { LucideIcon } from 'lucide-react'
+import {
+  Sparkles, Search, AlertTriangle, TrendingUp, BarChart2, Filter,
+  Globe, Bookmark, FileText, Activity, Shield,
+  X, Paperclip, ArrowRight, MessageSquare,
+} from 'lucide-react'
+import type { CompanySummary, SectorSummary, SignalSnapshot, SignalPerformanceSummary } from '@/lib/types'
+import { formatPercent, formatCurrency } from '@/lib/formatters'
+import {
+  explainSignal, explainForecast, explainRisk, explainReliability,
+  explainSectorContext, explainWatchlistContext, generateStockMemo,
+  routeQuestion,
+} from '@/lib/aiTemplates'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   companies: CompanySummary[]
   sectors: SectorSummary[]
   defaultCompany?: CompanySummary | null
   defaultQuestion?: string
+  watchedSymbols?: string[]
+  onToggleWatchlist?: (symbol: string) => void
+  signalSnapshots?: SignalSnapshot[]
+  signalSummary?: SignalPerformanceSummary[]
 }
+
 interface Message { role: 'user' | 'assistant'; content: string }
+
+type ViewMode = 'analysis' | 'chat'
+type ModeId   = 'signal' | 'forecast' | 'risk' | 'reliability' | 'sector' | 'watchlist' | 'memo'
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
 
 const D = {
   bg:        '#121414',
@@ -24,7 +46,8 @@ const D = {
   secondary: '#d0bcff',
   tertiary:  '#4edea3',
   error:     '#ffb4ab',
-  orange:    '#f59e0b',
+  orange:    '#fb923c',
+  warning:   '#f59e0b',
   text:      '#e2e2e2',
   textSec:   '#c2c6d6',
   textMuted: '#8c909f',
@@ -32,6 +55,43 @@ const D = {
   body:      'Inter, system-ui, sans-serif',
 }
 
+// ─── Analysis mode definitions ────────────────────────────────────────────────
+
+const ANALYSIS_MODES: ReadonlyArray<{ id: string; label: string; Icon: LucideIcon }> = [
+  { id: 'signal',      label: 'Signal',       Icon: Activity   },
+  { id: 'forecast',    label: 'Forecast',     Icon: TrendingUp },
+  { id: 'risk',        label: 'Risk',         Icon: Shield     },
+  { id: 'reliability', label: 'Reliability',  Icon: BarChart2  },
+  { id: 'sector',      label: 'Sector',       Icon: Globe      },
+  { id: 'watchlist',   label: 'Watchlist',    Icon: Bookmark   },
+  { id: 'memo',        label: 'Stock Memo',   Icon: FileText   },
+]
+
+// ─── Signal badge colours ─────────────────────────────────────────────────────
+
+const SIG_COLORS: Record<string, { text: string; bg: string; border: string }> = {
+  'Potential Opportunity':
+    { text: '#10B981', bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.30)' },
+  'Stable Watchlist':
+    { text: '#adc6ff', bg: 'rgba(173,198,255,0.10)', border: 'rgba(173,198,255,0.30)' },
+  'High Volatility Speculative':
+    { text: '#F59E0B', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.30)' },
+  'Needs Further Review':
+    { text: '#94A3B8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.30)' },
+  'Weak Fundamentals / Negative Forecast':
+    { text: '#EF4444', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.30)' },
+}
+const SIG_DEFAULT = { text: '#94A3B8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.3)' }
+
+// ─── Sidebar featured tickers ─────────────────────────────────────────────────
+
+const FEATURED = ['NVDA','AAPL','MSFT','TSLA','GOOGL','AMZN','META','AMD','JPM','V']
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getInitials(symbol: string): string {
+  return symbol.length >= 2 ? symbol.slice(0, 2) : symbol
+}
 
 function buildContext(company: CompanySummary | null, sector: SectorSummary | null): string {
   if (!company) return 'No company selected. User is asking a general market question.'
@@ -63,12 +123,6 @@ function buildContext(company: CompanySummary | null, sector: SectorSummary | nu
   ].join('\n')
 }
 
-function getInitials(symbol: string): string {
-  return symbol.length >= 2 ? symbol.slice(0, 2) : symbol
-}
-
-// ── Prompt pool ────────────────────────────────────────────────────────────────
-
 function getPromptPool(symbol: string): string[] {
   return [
     `Explain ${symbol}'s 30-day forecast signal`,
@@ -98,7 +152,7 @@ function getPromptPool(symbol: string): string[] {
   ]
 }
 
-// ── Markdown renderer ──────────────────────────────────────────────────────────
+// ─── Markdown renderer (unchanged) ───────────────────────────────────────────
 
 function parseInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/)
@@ -146,32 +200,62 @@ function renderMarkdown(content: string): React.ReactNode {
             </div>
           )
         }
-        if (line.trim() === '')
-          return <div key={i} style={{ height: 6 }} />
-        return (
-          <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: '#c2c6d6' }}>{parseInline(line)}</div>
-        )
+        if (line.trim() === '') return <div key={i} style={{ height: 6 }} />
+        return <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: '#c2c6d6' }}>{parseInline(line)}</div>
       })}
     </>
   )
 }
 
-export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQuestion }: Props) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function AIAnalyst({
+  companies,
+  sectors,
+  defaultCompany,
+  defaultQuestion,
+  watchedSymbols = [],
+  onToggleWatchlist,
+  signalSnapshots = [],
+}: Props) {
+
+  // ── Shared state ─────────────────────────────────────────────────────────────
   const [selectedSymbol, setSelectedSymbol] = useState(defaultCompany?.symbol || 'NVDA')
-  const [messages, setMessages]             = useState<Message[]>([])
-  const [input, setInput]                   = useState('')
-  const [loading, setLoading]               = useState(false)
-  const [error, setError]                   = useState<string | null>(null)
   const [sidebarSearch, setSidebarSearch]   = useState('')
-  const [chipSlots, setChipSlots]           = useState([0, 1, 2])
+  const [viewMode, setViewMode]             = useState<ViewMode>('analysis')
+
+  // ── Analysis state ───────────────────────────────────────────────────────────
+  const [activeMode, setActiveMode] = useState<ModeId>('signal')
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // ── Chat state (original) ────────────────────────────────────────────────────
+  const [messages, setMessages]   = useState<Message[]>([])
+  const [input, setInput]         = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+  const [chipSlots, setChipSlots] = useState([0, 1, 2])
   const nextChipRef = useRef(3)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const bottomRef   = useRef<HTMLDivElement>(null)
 
-  const company = useMemo(() => companies.find(c => c.symbol === selectedSymbol) ?? null, [companies, selectedSymbol])
-  const sector  = useMemo(() => company ? sectors.find(s => s.sector === company.sector) ?? null : null, [company, sectors])
+  // ── Derived data ──────────────────────────────────────────────────────────────
 
-  // Sidebar company list: curated featured + search
-  const FEATURED = ['NVDA', 'AAPL', 'MSFT', 'TSLA', 'GOOGL', 'AMZN', 'META', 'AMD', 'JPM', 'V']
+  const company = useMemo(
+    () => companies.find(c => c.symbol === selectedSymbol) ?? null,
+    [companies, selectedSymbol],
+  )
+  const sector = useMemo(
+    () => (company ? sectors.find(s => s.sector === company.sector) ?? null : null),
+    [company, sectors],
+  )
+  const isWatched = useMemo(
+    () => !!(company && watchedSymbols.includes(company.symbol)),
+    [company, watchedSymbols],
+  )
+  const companySnaps = useMemo(
+    () => signalSnapshots.filter(s => s.symbol === selectedSymbol),
+    [signalSnapshots, selectedSymbol],
+  )
+
   const sidebarCompanies = useMemo(() => {
     const q = sidebarSearch.toLowerCase()
     if (q) return companies.filter(c =>
@@ -186,36 +270,77 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
     return list.slice(0, 10)
   }, [companies, sidebarSearch, selectedSymbol])
 
-  useEffect(() => { if (defaultCompany) setSelectedSymbol(defaultCompany.symbol) }, [defaultCompany])
-  useEffect(() => {
-    if (messages.length > 0 || loading) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages, loading])
-
   const promptPool = useMemo(() => getPromptPool(selectedSymbol), [selectedSymbol])
 
-  // Reset chips whenever the selected company changes
+  // Deterministic analysis content for the selected analysis section
+  const analysisContent = useMemo<string>(() => {
+    if (!company) return ''
+    switch (activeMode) {
+      case 'signal':      return explainSignal(company)
+      case 'forecast':    return explainForecast(company)
+      case 'risk':        return explainRisk(company)
+      case 'reliability': return explainReliability(company)
+      case 'sector':      return explainSectorContext(company, sector)
+      case 'watchlist':   return explainWatchlistContext(company, isWatched, companySnaps)
+      case 'memo':        return generateStockMemo(company, sector, isWatched, companySnaps)
+      default:            return explainSignal(company)
+    }
+  }, [company, sector, activeMode, isWatched, companySnaps])
+
+  const metrics = company ? [
+    { label: 'Volatility', value: `${company.annualized_volatility_pct.toFixed(1)}%` },
+    { label: 'MAPE',       value: `${company.best_model_mape.toFixed(1)}%` },
+    { label: '30D Upside', value: (company.forecast_30d_upside_pct >= 0 ? '+' : '') + company.forecast_30d_upside_pct.toFixed(1) + '%' },
+    { label: 'Risk Level', value: company.risk_level === 'High Risk' ? 'HIGH' : company.risk_level === 'Moderate Risk' ? 'MED' : 'LOW' },
+    { label: 'EPS',        value: company.eps != null ? `$${company.eps.toFixed(2)}` : '—' },
+    { label: 'Margin',     value: company.profit_margin_pct != null ? `${company.profit_margin_pct.toFixed(1)}%` : '—' },
+  ] : [
+    { label: 'Volatility', value: '—' }, { label: 'MAPE', value: '—' },
+    { label: '30D Upside', value: '—' }, { label: 'Risk Level', value: '—' },
+    { label: 'EPS',        value: '—' }, { label: 'Margin', value: '—' },
+  ]
+
+  const sigColor = company ? (SIG_COLORS[company.final_signal] ?? SIG_DEFAULT) : SIG_DEFAULT
+
+  // ── Effects ───────────────────────────────────────────────────────────────────
+
+  // Sync defaultCompany → show Analysis view, signal section
+  useEffect(() => {
+    if (defaultCompany) {
+      setSelectedSymbol(defaultCompany.symbol)
+      setViewMode('analysis')
+      setActiveMode('signal')
+    }
+  }, [defaultCompany])
+
+  // defaultQuestion → switch to Chat view and auto-send
+  useEffect(() => {
+    if (defaultQuestion) {
+      setViewMode('chat')
+      const t = setTimeout(() => send(defaultQuestion), 300)
+      return () => clearTimeout(t)
+    }
+  }, [defaultQuestion]) // eslint-disable-line
+
+  // Scroll chat to bottom on new messages
+  useEffect(() => {
+    if ((messages.length > 0 || loading) && viewMode === 'chat') {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, loading, viewMode])
+
+  // Reset chip rotation when company changes
   useEffect(() => {
     setChipSlots([0, 1, 2])
     nextChipRef.current = 3
   }, [selectedSymbol])
 
-  const handleChipClick = useCallback((slotPosition: number) => {
-    const chip = promptPool[chipSlots[slotPosition] % promptPool.length]
-    send(chip)
-    setChipSlots(prev => {
-      const next = nextChipRef.current % promptPool.length
-      nextChipRef.current++
-      return prev.map((v, i) => i === slotPosition ? next : v)
-    })
-  }, [chipSlots, promptPool]) // eslint-disable-line
+  // Scroll analysis content to top when section or company changes
   useEffect(() => {
-    if (defaultQuestion) {
-      const t = setTimeout(() => send(defaultQuestion), 300)
-      return () => clearTimeout(t)
-    }
-  }, [defaultQuestion]) // eslint-disable-line
+    if (contentRef.current) contentRef.current.scrollTop = 0
+  }, [activeMode, selectedSymbol])
+
+  // ── Chat functions (original, restored) ───────────────────────────────────────
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return
@@ -233,41 +358,46 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
     finally { setLoading(false) }
   }
 
-  // Metric grid values from real company data
-  const metrics = company ? [
-    { label: 'Volatility', value: `${company.annualized_volatility_pct.toFixed(1)}%` },
-    { label: 'MAPE', value: `${company.best_model_mape.toFixed(1)}%` },
-    { label: '30D Upside', value: (company.forecast_30d_upside_pct >= 0 ? '+' : '') + company.forecast_30d_upside_pct.toFixed(1) + '%' },
-    { label: 'Risk Level', value: company.risk_level === 'High Risk' ? 'HIGH' : company.risk_level === 'Moderate Risk' ? 'MED' : 'LOW' },
-    { label: 'EPS', value: company.eps != null ? `$${company.eps.toFixed(2)}` : '—' },
-    { label: 'Margin', value: company.profit_margin_pct != null ? `${company.profit_margin_pct.toFixed(1)}%` : '—' },
-  ] : [
-    { label: 'Volatility', value: '—' },
-    { label: 'MAPE', value: '—' },
-    { label: '30D Upside', value: '—' },
-    { label: 'Risk Level', value: '—' },
-    { label: 'EPS', value: '—' },
-    { label: 'Margin', value: '—' },
-  ]
+  const handleChipClick = useCallback((slotPosition: number) => {
+    const chip = promptPool[chipSlots[slotPosition] % promptPool.length]
+    send(chip)
+    setChipSlots(prev => {
+      const next = nextChipRef.current % promptPool.length
+      nextChipRef.current++
+      return prev.map((v, i) => i === slotPosition ? next : v)
+    })
+  }, [chipSlots, promptPool]) // eslint-disable-line
 
-  const chipStyle = (active = false): React.CSSProperties => ({
+  // ── Shared sub-styles ─────────────────────────────────────────────────────────
+
+  const chipStyle: React.CSSProperties = {
     padding: '6px 14px', borderRadius: 999,
-    border: `1px solid ${active ? `${D.primary}40` : D.border}`,
-    background: active ? `${D.primary}08` : 'transparent',
+    border: `1px solid ${D.border}`,
+    background: 'transparent',
     color: D.textMuted, fontSize: 11, fontFamily: D.mono,
-    cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' as const,
+    cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+  }
+
+  const viewBtnStyle = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '6px 14px', borderRadius: 4,
+    border: `1px solid ${active ? `${D.primary}50` : D.border}`,
+    background: active ? `${D.primary}14` : 'transparent',
+    color: active ? D.primary : D.textMuted,
+    fontSize: 11, fontFamily: D.mono, fontWeight: active ? 600 : 400,
+    cursor: 'pointer', transition: 'all 0.12s',
   })
 
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return (
-    /* Full-bleed layout — negative margin to reclaim padding from parent */
     <div style={{ display: 'flex', margin: '-32px -24px 0', minHeight: 'calc(100vh - 116px)', fontFamily: D.body }}>
 
-      {/* ── LEFT SIDEBAR ────────────────────────────────────────────────── */}
+      {/* ── LEFT SIDEBAR ──────────────────────────────────────────────────── */}
       <aside style={{
         width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column',
         background: D.lowest, borderRight: `1px solid ${D.border}`,
       }}>
-
         {/* Markets header */}
         <div style={{ padding: '20px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 10, fontFamily: D.mono, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.15em', fontWeight: 600 }}>Markets</span>
@@ -292,8 +422,9 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
         {/* Company list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
           {sidebarCompanies.map(c => {
-            const active = c.symbol === selectedSymbol
-            const up = c.forecast_30d_upside_pct
+            const active  = c.symbol === selectedSymbol
+            const up      = c.forecast_30d_upside_pct
+            const watched = watchedSymbols.includes(c.symbol)
             return (
               <button key={c.symbol}
                 onClick={() => { setSelectedSymbol(c.symbol); setSidebarSearch('') }}
@@ -321,16 +452,19 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
                   <div style={{ fontSize: 12, fontWeight: 700, fontFamily: D.mono, color: D.text, lineHeight: 1.2 }}>{c.symbol}</div>
                   <div style={{ fontSize: 9, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: D.mono, marginTop: 1 }}>{c.company_name.slice(0, 14)}</div>
                 </div>
-                {/* Upside */}
-                <div style={{ fontSize: 11, fontWeight: 700, fontFamily: D.mono, color: up >= 0 ? D.tertiary : D.error, flexShrink: 0 }}>
-                  {up >= 0 ? '+' : ''}{up.toFixed(1)}%
+                {/* Upside + watchlist indicator */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  {watched && <Bookmark size={9} fill={D.orange} style={{ color: D.orange }} />}
+                  <div style={{ fontSize: 11, fontWeight: 700, fontFamily: D.mono, color: up >= 0 ? D.tertiary : D.error }}>
+                    {up >= 0 ? '+' : ''}{up.toFixed(1)}%
+                  </div>
                 </div>
               </button>
             )
           })}
         </div>
 
-        {/* Metrics grid at bottom */}
+        {/* Metrics grid */}
         <div style={{ padding: 16, borderTop: `1px solid ${D.border}`, background: D.lowest }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             {metrics.map(({ label, value }) => (
@@ -343,196 +477,314 @@ export default function AIAnalyst({ companies, sectors, defaultCompany, defaultQ
         </div>
       </aside>
 
-      {/* ── MAIN CHAT AREA ────────────────────────────────────────────────── */}
+      {/* ── MAIN PANEL ────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: D.surface, minWidth: 0 }}>
 
-        {/* Chat header */}
+        {/* Header */}
         <div style={{ padding: '16px 28px', borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <h1 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 700, letterSpacing: '-0.03em', margin: 0, background: 'linear-gradient(90deg, #adc6ff 0%, #4edea3 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              MarketPulse AI
-            </h1>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 3, border: `1px solid ${D.border}`, background: 'transparent', color: D.textSec, fontSize: 11, fontFamily: D.mono, cursor: 'pointer' }}>
-              History
+          <h1 style={{
+            fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 700,
+            letterSpacing: '-0.03em', margin: 0,
+            background: 'linear-gradient(90deg, #adc6ff 0%, #4edea3 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            MarketPulse AI
+          </h1>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* View toggle */}
+            <button onClick={() => setViewMode('analysis')} style={viewBtnStyle(viewMode === 'analysis')}>
+              <Activity size={11} /> Analysis
             </button>
-            <button
-              onClick={() => setMessages([])}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 3, background: D.primary, color: '#002e6a', fontSize: 11, fontFamily: D.mono, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-              + New Analysis
+            <button onClick={() => setViewMode('chat')} style={viewBtnStyle(viewMode === 'chat')}>
+              <MessageSquare size={11} /> Chat
             </button>
+            {/* Action button */}
+            {viewMode === 'chat' ? (
+              <button
+                onClick={() => { setMessages([]); setError(null) }}
+                style={{ ...viewBtnStyle(false), background: D.primary, color: '#002e6a', border: 'none', fontWeight: 700 }}>
+                + New Chat
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveMode('signal')}
+                style={{ ...viewBtnStyle(false), background: D.primary, color: '#002e6a', border: 'none', fontWeight: 700 }}>
+                + New Analysis
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Amber disclaimer */}
-        <div style={{ padding: '8px 28px', background: 'rgba(245,158,11,0.06)', borderBottom: '1px solid rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <AlertTriangle size={12} style={{ color: D.orange, flexShrink: 0 }} />
+        {/* Disclaimer */}
+        <div style={{ padding: '7px 28px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, borderBottom: `1px solid ${D.border}`, background: 'rgba(245,158,11,0.04)' }}>
+          <AlertTriangle size={11} style={{ color: D.warning, flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontFamily: D.mono, color: '#fcd34d', letterSpacing: '0.02em' }}>
-            AI explanations are grounded in dashboard data and are not financial advice.
+            {viewMode === 'analysis'
+              ? 'Analysis is generated deterministically from MarketPulse data · No external AI · Educational only · Not investment advice'
+              : 'AI explanations are grounded in dashboard data and are not financial advice.'}
           </span>
         </div>
 
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 0' }}>
-
-          {/* Empty state */}
-          {messages.length === 0 && !loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 300, textAlign: 'center', opacity: 0.65 }}>
-              <div style={{ width: 60, height: 60, borderRadius: '50%', background: D.high, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                <Sparkles size={24} style={{ color: D.primary }} />
-              </div>
-              <h3 style={{ fontSize: 20, fontWeight: 600, color: D.text, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Ready for Intelligent Analysis</h3>
-              <p style={{ fontSize: 13, color: D.textMuted, lineHeight: 1.6, maxWidth: 380 }}>
-                Ask me anything about{' '}
-                <span style={{ color: D.primary, fontFamily: D.mono, fontWeight: 600 }}>{company?.symbol ?? 'a company'}</span>
-                {', its recent volatility, or institutional sentiment correlations.'}
-              </p>
+        {/* ── ANALYSIS VIEW ─────────────────────────────────────────────── */}
+        {viewMode === 'analysis' && (
+          <>
+            {/* Section selector */}
+            <div style={{
+              display: 'flex', gap: 4, padding: '10px 28px',
+              borderBottom: `1px solid ${D.border}`, overflowX: 'auto',
+              flexShrink: 0, scrollbarWidth: 'none' as const,
+            }}>
+              {ANALYSIS_MODES.map(mode => {
+                const ModeIcon = mode.Icon
+                const active   = activeMode === mode.id
+                return (
+                  <button key={mode.id}
+                    onClick={() => setActiveMode(mode.id as ModeId)}
+                    disabled={!company}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '7px 14px', borderRadius: 4, flexShrink: 0,
+                      border: `1px solid ${active ? `${D.primary}50` : D.border}`,
+                      background: active ? `${D.primary}14` : 'transparent',
+                      color: active ? D.primary : D.textMuted,
+                      fontSize: 11, fontFamily: D.mono,
+                      cursor: company ? 'pointer' : 'default',
+                      opacity: company ? 1 : 0.4,
+                      transition: 'all 0.12s',
+                    }}
+                    onMouseEnter={e => {
+                      if (company && !active) {
+                        (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}30`
+                        ;(e.currentTarget as HTMLElement).style.color = D.textSec
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!active) {
+                        (e.currentTarget as HTMLElement).style.borderColor = D.border
+                        ;(e.currentTarget as HTMLElement).style.color = D.textMuted
+                      }
+                    }}>
+                    <ModeIcon size={11} />
+                    {mode.label}
+                  </button>
+                )
+              })}
             </div>
-          )}
 
-          {/* Message thread */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {messages.map((msg, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
-                {/* Avatar */}
-                <div style={{
-                  width: 30, height: 30, borderRadius: 4, flexShrink: 0, marginTop: 2,
-                  background: msg.role === 'assistant' ? `${D.secondary}18` : `${D.primary}18`,
-                  border: `1px solid ${msg.role === 'assistant' ? `${D.secondary}30` : `${D.primary}30`}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {msg.role === 'assistant'
-                    ? <Sparkles size={12} style={{ color: D.secondary }} />
-                    : <span style={{ fontSize: 9, fontWeight: 700, fontFamily: D.mono, color: D.primary }}>YOU</span>
-                  }
-                </div>
-                {/* Bubble */}
-                <div style={{ maxWidth: '80%' }}>
-                  {msg.role === 'assistant' && (
-                    <div style={{ fontSize: 10, fontFamily: D.mono, color: D.secondary, marginBottom: 6, letterSpacing: '0.02em' }}>
-                      MarketPulse AI <span style={{ color: D.textMuted }}>· Just now</span>
-                    </div>
-                  )}
-                  <div style={msg.role === 'assistant'
-                    ? { background: D.container, border: `1px solid ${D.border}`, borderRadius: '4px 12px 12px 12px', padding: '12px 16px' }
-                    : { background: `${D.secondary}12`, border: `1px solid ${D.secondary}25`, borderRadius: '12px 4px 12px 12px', padding: '12px 16px', fontSize: 13, lineHeight: 1.7, color: D.text, whiteSpace: 'pre-wrap' }
-                  }>
-                    {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
+            {/* Analysis content */}
+            <div ref={contentRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+              {!company ? (
+                /* Empty state */
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 380, textAlign: 'center', padding: '0 48px' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: D.high, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+                    <Sparkles size={26} style={{ color: D.primary }} />
                   </div>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, color: D.text, letterSpacing: '-0.02em', margin: '0 0 12px' }}>
+                    Select a Company to Begin
+                  </h3>
+                  <p style={{ fontSize: 13, color: D.textMuted, lineHeight: 1.65, maxWidth: 400, margin: '0 0 16px' }}>
+                    Select a company from the sidebar, or navigate here from{' '}
+                    <span style={{ color: D.textSec }}>Explorer</span>,{' '}
+                    <span style={{ color: D.textSec }}>Forecast</span>,{' '}
+                    <span style={{ color: D.textSec }}>Risk Matrix</span>, or{' '}
+                    <span style={{ color: D.textSec }}>Watchlist</span>{' '}
+                    to generate a MarketPulse AI explanation.
+                  </p>
+                  <p style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, lineHeight: 1.6, maxWidth: 440 }}>
+                    MarketPulse AI generates structured explanations from loaded dashboard data — signal, forecast, risk, reliability, sector context, watchlist status, and a full stock memo. No external AI is called.
+                  </p>
                 </div>
-              </div>
-            ))}
+              ) : (
+                <>
+                  {/* Company header card */}
+                  <div style={{ background: D.container, border: `1px solid ${D.border}`, borderRadius: 6, padding: '16px 20px', marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, fontFamily: D.mono, color: D.text }}>{company.symbol}</span>
+                          <span style={{ fontSize: 13, color: D.textSec }}>{company.company_name}</span>
+                        </div>
+                        <div style={{ fontSize: 10, fontFamily: D.mono, color: D.textMuted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {company.sector} · {company.industry}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, fontFamily: D.mono, color: D.textSec }}>{formatCurrency(company.latest_price)}</span>
+                          <span style={{ fontSize: 10, color: D.textMuted }}>→</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: D.mono, color: company.forecast_30d_upside_pct >= 0 ? D.tertiary : '#f87171' }}>
+                            {formatPercent(company.forecast_30d_upside_pct, 1)}
+                          </span>
+                          <span style={{ fontSize: 9, fontFamily: D.mono, padding: '2px 8px', borderRadius: 3, letterSpacing: '0.04em', color: sigColor.text, background: sigColor.bg, border: `1px solid ${sigColor.border}` }}>
+                            {company.final_signal}
+                          </span>
+                        </div>
+                      </div>
+                      {onToggleWatchlist ? (
+                        <button
+                          onClick={() => onToggleWatchlist(company.symbol)}
+                          title={isWatched ? `Remove ${company.symbol} from Watchlist` : `Add ${company.symbol} to Watchlist`}
+                          style={{ background: 'none', border: `1px solid ${D.border}`, borderRadius: 4, cursor: 'pointer', padding: '7px 10px', flexShrink: 0, color: isWatched ? D.orange : D.textMuted, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: D.mono }}>
+                          <Bookmark size={12} fill={isWatched ? D.orange : 'none'} />
+                          {isWatched ? 'In Watchlist' : '+ Watchlist'}
+                        </button>
+                      ) : isWatched ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: D.orange, fontSize: 10, fontFamily: D.mono, flexShrink: 0 }}>
+                          <Bookmark size={11} fill={D.orange} /> Watchlist
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
 
-            {/* Loading typing indicator */}
-            {loading && (
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 4, flexShrink: 0, background: `${D.secondary}18`, border: `1px solid ${D.secondary}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Sparkles size={12} style={{ color: D.secondary }} />
+                  {/* Analysis card */}
+                  <div style={{ background: D.container, border: `1px solid ${D.border}`, borderRadius: 6, padding: '20px 24px' }}>
+                    {renderMarkdown(analysisContent)}
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── CHAT VIEW (original, restored) ────────────────────────────── */}
+        {viewMode === 'chat' && (
+          <>
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 0' }}>
+
+              {/* Empty state */}
+              {messages.length === 0 && !loading && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 300, textAlign: 'center', opacity: 0.65 }}>
+                  <div style={{ width: 60, height: 60, borderRadius: '50%', background: D.high, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                    <Sparkles size={24} style={{ color: D.primary }} />
+                  </div>
+                  <h3 style={{ fontSize: 20, fontWeight: 600, color: D.text, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Ready for Intelligent Analysis</h3>
+                  <p style={{ fontSize: 13, color: D.textMuted, lineHeight: 1.6, maxWidth: 380 }}>
+                    Ask me anything about{' '}
+                    <span style={{ color: D.primary, fontFamily: D.mono, fontWeight: 600 }}>{company?.symbol ?? 'a company'}</span>
+                    {', its recent volatility, or institutional sentiment correlations.'}
+                  </p>
                 </div>
-                <div style={{ background: D.container, border: `1px solid ${D.border}`, borderRadius: '4px 12px 12px 12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {[0, 1, 2].map(j => (
-                    <div key={j} style={{ width: 6, height: 6, borderRadius: '50%', background: D.textMuted, animation: 'bounce 1.2s infinite', animationDelay: `${j * 0.2}s` }} />
-                  ))}
-                  <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, marginLeft: 4 }}>Analyzing...</span>
-                </div>
+              )}
+
+              {/* Message thread */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {messages.map((msg, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
+                    <div style={{
+                      width: 30, height: 30, borderRadius: 4, flexShrink: 0, marginTop: 2,
+                      background: msg.role === 'assistant' ? `${D.secondary}18` : `${D.primary}18`,
+                      border: `1px solid ${msg.role === 'assistant' ? `${D.secondary}30` : `${D.primary}30`}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {msg.role === 'assistant'
+                        ? <Sparkles size={12} style={{ color: D.secondary }} />
+                        : <span style={{ fontSize: 9, fontWeight: 700, fontFamily: D.mono, color: D.primary }}>YOU</span>}
+                    </div>
+                    <div style={{ maxWidth: '80%' }}>
+                      {msg.role === 'assistant' && (
+                        <div style={{ fontSize: 10, fontFamily: D.mono, color: D.secondary, marginBottom: 6, letterSpacing: '0.02em' }}>
+                          MarketPulse AI <span style={{ color: D.textMuted }}>· Just now</span>
+                        </div>
+                      )}
+                      <div style={msg.role === 'assistant'
+                        ? { background: D.container, border: `1px solid ${D.border}`, borderRadius: '4px 12px 12px 12px', padding: '12px 16px' }
+                        : { background: `${D.secondary}12`, border: `1px solid ${D.secondary}25`, borderRadius: '12px 4px 12px 12px', padding: '12px 16px', fontSize: 13, lineHeight: 1.7, color: D.text, whiteSpace: 'pre-wrap' }}>
+                        {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Typing indicator */}
+                {loading && (
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 4, flexShrink: 0, background: `${D.secondary}18`, border: `1px solid ${D.secondary}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkles size={12} style={{ color: D.secondary }} />
+                    </div>
+                    <div style={{ background: D.container, border: `1px solid ${D.border}`, borderRadius: '4px 12px 12px 12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {[0,1,2].map(j => (
+                        <div key={j} style={{ width: 6, height: 6, borderRadius: '50%', background: D.textMuted, animation: 'bounce 1.2s infinite', animationDelay: `${j * 0.2}s` }} />
+                      ))}
+                      <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, marginLeft: 4 }}>Analyzing...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error */}
+                {error && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, fontSize: 11, fontFamily: D.mono, color: D.warning }}>
+                    <AlertTriangle size={11} style={{ flexShrink: 0, marginTop: 1 }} />
+                    AI Analyst temporarily unavailable. Try the Analysis view above or the Learn tab to explore metrics.
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Error */}
-            {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 4, fontSize: 11, fontFamily: D.mono, color: D.orange }}>
-                <AlertTriangle size={11} style={{ flexShrink: 0, marginTop: 1 }} />
-                AI Analyst temporarily unavailable. Try the Learn tab to explore metrics.
+              <div ref={bottomRef} style={{ height: 28 }} />
+            </div>
+
+            {/* Input area */}
+            <div style={{ padding: '16px 28px 24px', flexShrink: 0 }}>
+              {/* Chips */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {chipSlots.map((poolIdx, slotPos) => {
+                  const chip = promptPool[poolIdx % promptPool.length]
+                  return (
+                    <button key={`${slotPos}-${poolIdx}`} onClick={() => handleChipClick(slotPos)} disabled={loading}
+                      style={{ ...chipStyle, opacity: loading ? 0.4 : 1 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}50`; (e.currentTarget as HTMLElement).style.color = D.textSec }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = D.border; (e.currentTarget as HTMLElement).style.color = D.textMuted }}>
+                      {chip}
+                    </button>
+                  )
+                })}
               </div>
-            )}
-          </div>
 
-          <div ref={bottomRef} style={{ height: 28 }} />
-        </div>
-
-        {/* ── Input area ──────────────────────────────────────────────────── */}
-        <div style={{ padding: '16px 28px 24px', flexShrink: 0 }}>
-
-          {/* Chips above input — dynamic, rotate on use */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {chipSlots.map((poolIdx, slotPos) => {
-              const chip = promptPool[poolIdx % promptPool.length]
-              return (
-                <button key={`${slotPos}-${poolIdx}`} onClick={() => handleChipClick(slotPos)} disabled={loading}
-                  style={{ ...chipStyle(), opacity: loading ? 0.4 : 1 }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}50`; (e.currentTarget as HTMLElement).style.color = D.textSec }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = D.border; (e.currentTarget as HTMLElement).style.color = D.textMuted }}>
-                  {chip}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Textarea container */}
-          <div style={{
-            background: D.container, border: `1px solid rgba(66,71,84,0.6)`,
-            borderRadius: 8, padding: 14,
-            boxShadow: input ? '0 0 0 1px rgba(173,198,255,0.15), 0 0 20px rgba(173,198,255,0.04)' : 'none',
-            transition: 'box-shadow 0.2s',
-          }}
-            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}40`}
-            onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(66,71,84,0.6)'}
-          >
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
-              placeholder={company
-                ? `Analyze market trends, cross-asset correlations, or specific tickers...`
-                : 'Analyze market trends, cross-asset correlations, or specific tickers...'}
-              rows={3}
-              style={{
-                width: '100%', resize: 'none', background: 'transparent',
-                border: 'none', outline: 'none', color: D.text,
-                fontSize: 13, fontFamily: D.body, lineHeight: 1.6,
-                boxSizing: 'border-box' as const,
+              {/* Textarea */}
+              <div style={{
+                background: D.container, border: `1px solid rgba(66,71,84,0.6)`,
+                borderRadius: 8, padding: 14,
+                boxShadow: input ? '0 0 0 1px rgba(173,198,255,0.15), 0 0 20px rgba(173,198,255,0.04)' : 'none',
+                transition: 'box-shadow 0.2s',
               }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${D.border}` }}>
-              {/* Toolbar icons */}
-              <div style={{ display: 'flex', gap: 14, color: D.textMuted }}>
-                <TrendingUp size={15} style={{ cursor: 'pointer' }} />
-                <BarChart2 size={15} style={{ cursor: 'pointer' }} />
-                <Paperclip size={15} style={{ cursor: 'pointer' }} />
+                onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = `${D.primary}40`}
+                onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(66,71,84,0.6)'}>
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
+                  placeholder="Analyze market trends, cross-asset correlations, or specific tickers..."
+                  rows={3}
+                  style={{ width: '100%', resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: D.text, fontSize: 13, fontFamily: D.body, lineHeight: 1.6, boxSizing: 'border-box' as const }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${D.border}` }}>
+                  <div style={{ display: 'flex', gap: 14, color: D.textMuted }}>
+                    <TrendingUp size={15} style={{ cursor: 'pointer' }} />
+                    <BarChart2 size={15} style={{ cursor: 'pointer' }} />
+                    <Paperclip size={15} style={{ cursor: 'pointer' }} />
+                  </div>
+                  <button
+                    onClick={() => send(input)}
+                    disabled={loading || !input.trim()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', borderRadius: 6, background: D.primary, color: '#002e6a', fontSize: 12, fontFamily: D.mono, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: loading || !input.trim() ? 0.4 : 1, letterSpacing: '0.04em', transition: 'opacity 0.15s' }}>
+                    Process Analysis
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
               </div>
-              {/* Send */}
-              <button
-                onClick={() => send(input)}
-                disabled={loading || !input.trim()}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 20px', borderRadius: 6,
-                  background: D.primary, color: '#002e6a',
-                  fontSize: 12, fontFamily: D.mono, fontWeight: 700,
-                  border: 'none', cursor: 'pointer',
-                  opacity: loading || !input.trim() ? 0.4 : 1,
-                  letterSpacing: '0.04em', transition: 'opacity 0.15s',
-                }}>
-                Process Analysis
-                <ArrowRight size={13} />
-              </button>
-            </div>
-          </div>
 
-          {/* Clear chat */}
-          {messages.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button onClick={() => { setMessages([]); setError(null) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontFamily: D.mono, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '4px 10px', borderRadius: 3, cursor: 'pointer' }}>
-                <X size={9} /> Clear conversation
-              </button>
+              {/* Clear */}
+              {messages.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button onClick={() => { setMessages([]); setError(null) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontFamily: D.mono, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '4px 10px', borderRadius: 3, cursor: 'pointer' }}>
+                    <X size={9} /> Clear conversation
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
-      {/* Inline keyframes */}
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.35} }
         @keyframes bounce { 0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)} }
