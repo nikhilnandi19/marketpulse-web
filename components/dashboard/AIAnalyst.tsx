@@ -173,20 +173,110 @@ function parseInline(text: string): React.ReactNode {
 
 function renderMarkdown(content: string): React.ReactNode {
   const lines = content.split('\n')
+
+  // ── First pass: group consecutive table lines into blocks ──────────────────
+  type Block =
+    | { type: 'line';  line: string; key: number }
+    | { type: 'table'; rows: string[]; key: number }
+
+  const blocks: Block[] = []
+  let i = 0
+  while (i < lines.length) {
+    if (/^\s*\|/.test(lines[i])) {
+      const tableRows: string[] = []
+      while (i < lines.length && /^\s*\|/.test(lines[i])) {
+        tableRows.push(lines[i])
+        i++
+      }
+      blocks.push({ type: 'table', rows: tableRows, key: i })
+    } else {
+      blocks.push({ type: 'line', line: lines[i], key: i })
+      i++
+    }
+  }
+
+  const parseRow = (row: string) =>
+    row.split('|').slice(1, -1).map(c => c.trim())
+
+  const isSeparator = (row: string) => /^\s*\|[\s\-:|]+\|\s*$/.test(row)
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      {lines.map((line, i) => {
+      {blocks.map((block) => {
+        // ── Table block ──────────────────────────────────────────────────────
+        if (block.type === 'table') {
+          const meaningful = block.rows.filter(r => !isSeparator(r))
+          if (!meaningful.length) return null
+          const [headerRow, ...dataRows] = meaningful
+          const headers = parseRow(headerRow)
+          return (
+            <div key={block.key} style={{ overflowX: 'auto', margin: '14px 0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(198,192,255,0.06)' }}>
+                    {headers.map((h, hi) => (
+                      <th key={hi} style={{
+                        padding: '8px 14px',
+                        textAlign: 'left' as const,
+                        fontSize: 10,
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontWeight: 600,
+                        color: '#928f9f',
+                        letterSpacing: '0.09em',
+                        textTransform: 'uppercase' as const,
+                        borderBottom: '1px solid rgba(255,255,255,0.12)',
+                        whiteSpace: 'nowrap' as const,
+                      }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataRows.map((row, ri) => {
+                    const cells = parseRow(row)
+                    return (
+                      <tr key={ri} style={{
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        background: ri % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                      }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(198,192,255,0.06)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ri % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                        {cells.map((cell, ci) => (
+                          <td key={ci} style={{
+                            padding: '8px 14px',
+                            fontSize: 12,
+                            color: ci === 0 ? '#e2e2e2' : '#c2c6d6',
+                            fontFamily: ci === 0 ? 'JetBrains Mono, monospace' : 'Inter, sans-serif',
+                            fontWeight: ci === 0 ? 600 : 400,
+                            whiteSpace: 'nowrap' as const,
+                          }}>
+                            {parseInline(cell)}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+
+        // ── Regular line ─────────────────────────────────────────────────────
+        const { line, key } = block
         if (/^### /.test(line))
-          return <div key={i} style={{ fontSize: 13, fontWeight: 700, color: '#adc6ff', marginTop: 14, marginBottom: 4 }}>{parseInline(line.slice(4))}</div>
+          return <div key={key} style={{ fontSize: 13, fontWeight: 700, color: '#adc6ff', marginTop: 14, marginBottom: 4 }}>{parseInline(line.slice(4))}</div>
         if (/^## /.test(line))
-          return <div key={i} style={{ fontSize: 14, fontWeight: 700, color: '#adc6ff', marginTop: 16, marginBottom: 5 }}>{parseInline(line.slice(3))}</div>
+          return <div key={key} style={{ fontSize: 14, fontWeight: 700, color: '#adc6ff', marginTop: 16, marginBottom: 5 }}>{parseInline(line.slice(3))}</div>
         if (/^# /.test(line))
-          return <div key={i} style={{ fontSize: 15, fontWeight: 700, color: '#adc6ff', marginTop: 18, marginBottom: 6 }}>{parseInline(line.slice(2))}</div>
+          return <div key={key} style={{ fontSize: 15, fontWeight: 700, color: '#adc6ff', marginTop: 18, marginBottom: 6 }}>{parseInline(line.slice(2))}</div>
         if (/^---+$/.test(line.trim()))
-          return <div key={i} style={{ borderTop: '1px solid rgba(66,71,84,0.5)', margin: '10px 0' }} />
+          return <div key={key} style={{ borderTop: '1px solid rgba(66,71,84,0.5)', margin: '10px 0' }} />
         if (/^[-*•] /.test(line))
           return (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 3, lineHeight: 1.65 }}>
+            <div key={key} style={{ display: 'flex', gap: 8, marginBottom: 3, lineHeight: 1.65 }}>
               <span style={{ color: '#adc6ff', flexShrink: 0, fontSize: 10, marginTop: 3 }}>▸</span>
               <span style={{ fontSize: 13, color: '#c2c6d6' }}>{parseInline(line.replace(/^[-*•] /, ''))}</span>
             </div>
@@ -194,14 +284,14 @@ function renderMarkdown(content: string): React.ReactNode {
         if (/^\d+\. /.test(line)) {
           const m = line.match(/^(\d+)\. (.+)/)
           if (m) return (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 3, lineHeight: 1.65 }}>
+            <div key={key} style={{ display: 'flex', gap: 8, marginBottom: 3, lineHeight: 1.65 }}>
               <span style={{ color: '#adc6ff', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, minWidth: 18, marginTop: 2 }}>{m[1]}.</span>
               <span style={{ fontSize: 13, color: '#c2c6d6' }}>{parseInline(m[2])}</span>
             </div>
           )
         }
-        if (line.trim() === '') return <div key={i} style={{ height: 6 }} />
-        return <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: '#c2c6d6' }}>{parseInline(line)}</div>
+        if (line.trim() === '') return <div key={key} style={{ height: 6 }} />
+        return <div key={key} style={{ fontSize: 13, lineHeight: 1.7, color: '#c2c6d6' }}>{parseInline(line)}</div>
       })}
     </>
   )
