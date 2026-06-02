@@ -681,7 +681,7 @@ export default function AIAnalyst({
                     to generate a MarketPulse AI explanation.
                   </p>
                   <p style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, lineHeight: 1.6, maxWidth: 440 }}>
-                    MarketPulse AI generates structured explanations from loaded dashboard data — signal, forecast, risk, reliability, sector context, watchlist status, and a full stock memo. No external AI is called.
+                    MarketPulse AI generates explanations from loaded dashboard data: signal, forecast, risk, reliability, sector context, watchlist status, and a full stock memo. No external data is fetched.
                   </p>
                 </div>
               ) : (
@@ -750,7 +750,7 @@ export default function AIAnalyst({
                   <p style={{ fontSize: 13, color: D.textMuted, lineHeight: 1.6, maxWidth: 380 }}>
                     Ask me anything about{' '}
                     <span style={{ color: D.primary, fontFamily: D.mono, fontWeight: 600 }}>{company?.symbol ?? 'a company'}</span>
-                    {', its recent volatility, or institutional sentiment correlations.'}
+                    {', or its recent price volatility.'}
                   </p>
                 </div>
               )}

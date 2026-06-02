@@ -355,7 +355,7 @@ const SECTIONS: Section[] = [
         synonyms: ['overfitting', 'historical performance', 'past performance', 'backtesting', 'hindsight bias', 'curve fitting'],
         plain: 'The fact that a model performed well in the past does not guarantee future performance.',
         detail: 'Model reliability (MAPE) is measured on a historical test window. Market conditions change. A model that worked well in a calm market may perform poorly in a volatile one.',
-        example: "A MAPE of 1.2% on the test window is impressive — but next month's real accuracy could be very different.",
+        example: "A MAPE of 1.2% on the test window is impressive, but next month's real accuracy could be very different.",
         links: [{ label: 'Overfitting in Finance', url: 'https://www.investopedia.com/terms/o/overfitting.asp', source: 'investopedia' }],
       },
       {
@@ -612,7 +612,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
   const [query, setQuery] = useState('')
   const [openSection, setOpenSection] = useState('')
   const [openConcept, setOpenConcept] = useState<string | null>(null)
-  const [deepDiveFilter, setDeepDiveFilter] = useState<'all' | 'institutional'>('all')
+  const [deepDiveFilter, setDeepDiveFilter] = useState<'all' | 'advanced'>('all')
 
   const searchResults = useMemo(() => searchConcepts(query), [query])
   const isSearching = query.trim().length > 0
@@ -625,7 +625,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
     if (openSection) {
       concepts = concepts.filter(c => c.section.id === openSection)
     }
-    if (deepDiveFilter === 'institutional') {
+    if (deepDiveFilter === 'advanced') {
       concepts = concepts.filter(c => ['Model', 'Error Metric', 'Methodology', 'Signal'].includes(c.tag))
     }
     return concepts
@@ -672,7 +672,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
           textAlign: 'center', color: D.textMuted,
           fontSize: 16, lineHeight: 1.65, maxWidth: 560, margin: '0 auto 40px',
         }}>
-          Every concept used in this dashboard explained in plain English. No jargon, just institutional-grade clarity.
+          Every concept used in this dashboard explained in plain English. No jargon, just clear explanations.
         </p>
 
         {/* Search bar */}
@@ -843,7 +843,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
               Deep Dive: Methodology &amp; Metrics
             </h2>
             <div style={{ display: 'flex', gap: 8 }}>
-              {(['all', 'institutional'] as const).map(f => (
+              {(['all', 'advanced'] as const).map(f => (
                 <button key={f} onClick={() => setDeepDiveFilter(f)}
                   style={{
                     padding: '5px 14px', borderRadius: 4, cursor: 'pointer',
@@ -854,7 +854,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
                     border: `1px solid ${deepDiveFilter === f ? D.primary : D.border}`,
                     fontWeight: deepDiveFilter === f ? 700 : 400,
                   }}>
-                  {f === 'all' ? 'All Levels' : 'Institutional'}
+                  {f === 'all' ? 'All Levels' : 'Advanced'}
                 </button>
               ))}
             </div>

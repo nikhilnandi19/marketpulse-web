@@ -166,7 +166,7 @@ export default function ExecutiveOverview({
             Executive Overview
           </h1>
           <p style={{ fontSize: 18, color: S.textSecondary, maxWidth: 640, lineHeight: 1.65 }}>
-            Institutional-grade market intelligence. High-fidelity signals processed through predictive liquidity models and tier-1 risk frameworks.
+            S&P 500 forecast data, risk scores, and model reliability in one place. Built on real backtested models, not black-box outputs.
           </p>
         </section>
 

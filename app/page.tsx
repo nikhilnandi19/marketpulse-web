@@ -402,7 +402,7 @@ export default function Home() {
                 Company Explorer
               </h2>
               <p style={{ fontSize: 15, color: '#8c909f', lineHeight: 1.65, marginBottom: 24 }}>
-                Dive into a high-density environment for surgical analysis. Track sector rotation, AI-identified opportunities, and systematic risks across all {companies.length || '—'} constituent nodes.
+                Browse all {companies.length || 522} S&P 500 companies. Filter by sector, signal, and risk to find what's worth watching.
               </p>
               <button onClick={() => switchTab('explorer')}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#adc6ff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0 }}>

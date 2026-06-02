@@ -185,7 +185,7 @@ export default function WatchlistDashboard({
               </span>
             </div>
             <p style={{ fontSize: 14, color: S.textMuted, lineHeight: 1.6, margin: 0, maxWidth: 520 }}>
-              Track selected companies and monitor their forecast, risk, and signal profile in real-time with institutional precision.
+              Track selected companies and monitor their forecast, risk, and signal profile.
             </p>
           </div>
           <button onClick={onNavigateToExplorer}
