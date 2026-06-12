@@ -1,4 +1,5 @@
 model_error_band,model_error_band_order,company_count
-Elite Reliability,1,42
-Very Strong Reliability,2,343
-Strong Reliability,3,137
+Elite Reliability,1,43
+Very Strong Reliability,2,338
+Strong Reliability,3,140
+Higher Error,5,1
