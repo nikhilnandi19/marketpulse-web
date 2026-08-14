@@ -1,4 +1,4 @@
 risk_level,snapshot_count,complete_count,avg_forecast_30d_upside_pct,avg_return_5d_pct,avg_return_10d_pct,avg_return_30d_pct,hit_rate_30d_pct
-Low Risk,15521,6593,1.5953,0.8168,1.5836,4.6218,52.45
-Medium Risk,9157,3912,2.2927,0.8258,1.7344,4.799,46.78
-High Risk,2963,1345,2.155,-0.0627,0.1124,-2.4002,48.62
+Low Risk,15801,6961,1.603,0.7953,1.5555,4.5348,52.03
+Medium Risk,9332,4100,2.3341,0.8207,1.7667,4.8315,46.83
+High Risk,3029,1402,2.259,-0.0517,0.2727,-2.2341,48.64
