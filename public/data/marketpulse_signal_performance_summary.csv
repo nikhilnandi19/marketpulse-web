@@ -1,6 +1,6 @@
 signal_category,snapshot_count,pending_count,partial_count,complete_count,avg_forecast_30d_upside_pct,avg_return_5d_pct,avg_return_10d_pct,avg_return_30d_pct,hit_rate_5d_pct,hit_rate_10d_pct,hit_rate_30d_pct
-Needs Further Review,10674,943,4196,5535,0.4599,0.7735,1.5777,4.161,47.88,49.76,50.1
-Stable Watchlist,9645,926,4095,4624,0.0513,0.8174,1.5517,3.6942,50.27,50.17,51.28
-Potential Opportunity,7854,411,3098,4345,9.6957,-0.0494,0.4067,3.2982,49.11,52.41,61.8
-Weak Fundamentals / Negative Forecast,4036,318,1368,2350,-8.2206,1.3722,2.1839,5.944,41.42,38.89,35.45
-High Volatility Speculative,627,26,293,308,14.1008,-1.7098,-1.5624,-6.9166,38.44,38.36,34.74
+Needs Further Review,10872,965,4165,5742,0.4376,0.7533,1.5304,4.1207,47.92,49.6,50.09
+Stable Watchlist,9826,938,4110,4778,0.0463,0.7955,1.4952,3.6594,50.29,50.13,51.28
+Potential Opportunity,7911,370,3109,4432,9.6847,-0.0511,0.3744,3.3029,49.08,52.15,61.89
+Weak Fundamentals / Negative Forecast,4115,331,1367,2417,-8.2049,1.3331,2.1802,5.9569,41.86,38.9,35.54
+High Volatility Speculative,630,21,299,310,14.1038,-1.7103,-1.4886,-6.8604,38.26,37.92,34.84
