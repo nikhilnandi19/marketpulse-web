@@ -4,9 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Plus, Trash2, Share2, Bot } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { CompanySummary } from '@/lib/types'
-import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, WINDOWS, type WindowKey } from '@/lib/risk'
+import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, WINDOWS, computeFlags, type WindowKey } from '@/lib/risk'
 import { usePortfolio, type Confidence } from '@/lib/usePortfolio'
 import { S, glass, fmtPct, fmtDate, fmtMoney, pctColor, labelStyle } from './tokens'
+import RiskContribution, { type ContributionMode } from './RiskContribution'
+import CorrelationHeatmap from './CorrelationHeatmap'
+import Diversification from './Diversification'
+import Flags from './Flags'
+import { RollingCorrelationChart, RollingVolChart } from './RollingCharts'
 
 interface Props {
   companies: CompanySummary[]
@@ -125,6 +130,8 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
   const m = a?.metrics ?? null
   const [mode, setMode] = useState<'rebalanced' | 'hold'>('rebalanced')
   const [query, setQuery] = useState('')
+  const [contribMode, setContribMode] = useState<ContributionMode>('vol')
+  const [hovered, setHovered] = useState<string | null>(null)
 
   const rawSum = watchedSymbols.reduce((s, sym) => s + (p.rawWeights[sym] ?? 0), 0)
   const tail = m ? (p.settings.confidence === 0.99 ? m.tail99 : m.tail95) : null
@@ -152,6 +159,8 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
       bdd: g.benchmarkDd[i],
     }))
   }, [a, mode])
+
+  const flags = useMemo(() => (m ? computeFlags(m) : []), [m])
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -331,11 +340,11 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 840 }}>
               <thead>
                 <tr>
-                  {['Stock', 'Sector', 'Weight', '30D forecast', 'Volatility', 'Beta', ''].map((h, i) => (
-                    <th key={i} style={{ ...labelStyle, textAlign: i >= 2 && i <= 5 ? 'right' : 'left', padding: '12px 16px', fontWeight: 500, borderBottom: `1px solid ${S.divider}` }}>{h}</th>
+                  {['Stock', 'Sector', 'Weight', 'Risk share', '30D forecast', 'Volatility', 'Beta', ''].map((h, i) => (
+                    <th key={i} style={{ ...labelStyle, textAlign: i >= 2 && i <= 6 ? 'right' : 'left', padding: '12px 16px', fontWeight: 500, borderBottom: `1px solid ${S.divider}` }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -345,7 +354,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
                   const h = holdingOf[sym]
                   const ex = excludedOf[sym]
                   return (
-                    <tr key={sym} style={{ borderBottom: `1px solid ${S.divider}` }}>
+                    <tr key={sym} onMouseEnter={() => setHovered(sym)} onMouseLeave={() => setHovered(null)} style={{ borderBottom: `1px solid ${S.divider}`, background: hovered === sym ? 'rgba(198,192,255,0.07)' : 'transparent' }}>
                       <td style={td}>
                         <div style={{ fontFamily: S.mono, fontWeight: 700, color: S.textPrimary, fontSize: 14 }}>{sym}</div>
                         <div style={{ fontSize: 12, color: S.textMuted }}>{c?.company_name ?? 'Unknown company'}</div>
@@ -355,6 +364,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
                       <td style={{ ...td, textAlign: 'right' }}>
                         <WeightInput symbol={sym} value={p.rawWeights[sym] ?? 0} onCommit={v => p.setWeight(sym, v)} />
                       </td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: S.textPrimary }}>{h ? fmtPct(h.riskPercent) : 'n/a'}</td>
                       <td style={{ ...td, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: pctColor(c?.forecast_30d_upside_pct) }}>
                         {c ? `${c.forecast_30d_upside_pct >= 0 ? '+' : ''}${c.forecast_30d_upside_pct.toFixed(1)}%` : 'n/a'}
                       </td>
@@ -371,7 +381,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
                 <tr>
                   <td style={{ ...td, ...labelStyle }} colSpan={2}>Total</td>
                   <td style={{ ...td, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: Math.abs(rawSum - 100) > 0.05 ? S.warning : S.textPrimary }}>{round(rawSum)}%</td>
-                  <td colSpan={4} />
+                  <td colSpan={5} />
                 </tr>
               </tbody>
             </table>
@@ -401,6 +411,27 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
           </div>
         </div>
 
+        {/* Where the risk comes from */}
+        {m && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 16, alignItems: 'start', opacity: p.computing ? 0.6 : 1, transition: 'opacity .2s' }}>
+            <RiskContribution holdings={m.holdings} mode={contribMode} onMode={setContribMode} tailCount={m.tailContribution.tailCount}
+              confidence={p.settings.confidence} hovered={hovered} onHover={setHovered} />
+            <Flags flags={flags} hovered={hovered} onHover={setHovered} />
+          </div>
+        )}
+
+        {/* Diversification */}
+        {m && a?.growth && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 16, opacity: p.computing ? 0.6 : 1, transition: 'opacity .2s' }}>
+              <Diversification m={m} />
+              <RollingCorrelationChart m={m} growth={a.growth} />
+            </div>
+            <CorrelationHeatmap symbols={m.symbols} corr={m.corr} sectorOf={sectorOf} hovered={hovered} onHover={setHovered} />
+            <RollingVolChart m={m} />
+          </>
+        )}
+
         {/* Method */}
         <details style={glass({ padding: '16px 24px' })}>
           <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600, color: S.textPrimary }}>How these numbers are calculated</summary>
@@ -411,6 +442,8 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
             <li>Volatility is the standard deviation of daily returns times the square root of 252 trading days.</li>
             <li>VaR is the loss on the 5th (or 1st) worst percentile of past days. Shortfall is the average loss on the days at or beyond that cutoff. Both are historical, not predictions.</li>
             <li>Max drawdown is the largest fall from a running high to a later low.</li>
+            <li>Risk share is weight times marginal volatility divided by portfolio volatility, so the shares add up to 100%. Bad-day share is each stock's average loss on the portfolio's worst days, as a share of expected shortfall.</li>
+            <li>Correlation is the Pearson correlation of daily returns over the window. Average correlation is weighted by position sizes.</li>
             <li>A stock with returns on less than 90% of the window is left out and named above, so one recent listing cannot shrink everyone's window.</li>
             <li>Today's S&P 500 members only. Stocks that left the index are not included.</li>
           </ul>
