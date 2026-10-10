@@ -11,6 +11,7 @@ import AIAnalyst from '@/components/dashboard/AIAnalyst'
 import LearnTab from '@/components/dashboard/LearnTab'
 import SignalPerformance from '@/components/dashboard/SignalPerformance'
 import WatchlistDashboard from '@/components/dashboard/WatchlistDashboard'
+import PortfolioDashboard from '@/components/portfolio/PortfolioDashboard'
 import { useWatchlist } from '@/lib/useWatchlist'
 import {
   loadCompanySummary, loadSectorSummary, loadKPIs,
@@ -23,10 +24,13 @@ import type {
   SignalSnapshot, SignalPerformanceSummary, SignalPerformanceBySector, SignalPerformanceByRisk,
 } from '@/lib/types'
 
+// Portfolio risk lab is behind a flag until it reaches parity with the Watchlist.
+const RISK_LAB = process.env.NEXT_PUBLIC_RISK_LAB === '1'
+
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Activity },
   { id: 'explorer',  label: 'Explorer',  icon: BarChart2 },
-  { id: 'watchlist', label: 'Watchlist',  icon: Bookmark },
+  { id: 'watchlist', label: RISK_LAB ? 'Portfolio' : 'Watchlist',  icon: Bookmark },
   { id: 'forecast',  label: 'Forecast',  icon: GitBranch },
   { id: 'sector', label: 'Sector', icon: Globe },
   { id: 'matrix', label: 'Risk Matrix', icon: Crosshair },
@@ -792,7 +796,17 @@ export default function Home() {
                   onToggleWatchlist={toggleWatchlist}
                 />
               )}
-              {activeTab === 'watchlist' && (
+              {activeTab === 'watchlist' && RISK_LAB && (
+                <PortfolioDashboard
+                  companies={companies}
+                  watchedSymbols={watchedSymbols}
+                  onToggleWatchlist={toggleWatchlist}
+                  onViewForecast={navigateToForecast}
+                  onViewAI={navigateToAI}
+                  onNavigateToExplorer={() => switchTab('explorer')}
+                />
+              )}
+              {activeTab === 'watchlist' && !RISK_LAB && (
                 <WatchlistDashboard
                   companies={companies}
                   watchedSymbols={watchedSymbols}
