@@ -340,6 +340,83 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'portfolio', icon: Activity, title: 'Portfolio Risk Methodology', color: '#c6c0ff',
+    summary: 'How the Portfolio page measures risk: formulas, data, and what the numbers cannot tell you.',
+    concepts: [
+      {
+        term: 'Portfolio volatility', tag: 'Portfolio',
+        synonyms: ['portfolio risk', 'portfolio standard deviation', 'combined volatility', 'diversification benefit'],
+        plain: "How much the whole portfolio's daily returns swing, scaled to a year.",
+        detail: 'Each day the portfolio return is the weighted sum of the stocks\' returns. Volatility is the standard deviation of those daily returns (n-1 in the denominator) times the square root of 252 trading days. It is lower than the average of the stocks\' volatilities when the stocks do not move in lockstep.',
+        example: 'Two stocks with 30% volatility each and a correlation of 0.3 give a 50/50 portfolio volatility of about 24%.',
+      },
+      {
+        term: 'Value at Risk (VaR)', tag: 'Portfolio',
+        synonyms: ['var', 'value at risk', '95% var', 'worst day loss', 'historical simulation', 'daily loss'],
+        plain: 'A loss level that was only exceeded on the worst 1 in 20 days (at 95%).',
+        detail: 'We use historical simulation: sort the portfolio\'s past daily returns and read the 5th percentile (1st at 99%), with linear interpolation between neighbouring days. It is shown as a positive loss, in percent and in dollars for the portfolio size you enter. It says how often, not how bad: it is silent about the size of losses beyond the cutoff.',
+        example: 'A 95% 1-day VaR of 1.5% on $100,000 means that on 19 of 20 past days the loss was under $1,500.',
+      },
+      {
+        term: 'Expected shortfall (ES)', tag: 'Portfolio',
+        synonyms: ['expected shortfall', 'cvar', 'conditional var', 'tail loss', 'average loss on bad days'],
+        plain: 'The average loss on the worst days, the ones beyond the VaR cutoff.',
+        detail: 'ES averages the returns on all days at or below the VaR cutoff. It is always at least as large as VaR. It is reported next to VaR because it describes how bad the bad days were, and because ES, unlike VaR, never makes a combined portfolio look riskier than the sum of its parts would suggest (it is subadditive).',
+        example: 'VaR 1.5% with ES 2.3% means the worst 1 in 20 days lost at least 1.5%, and averaged 2.3%.',
+      },
+      {
+        term: 'Small tail samples', tag: 'Limitation',
+        synonyms: ['low confidence', '99% var', 'tail observations', 'sample size', 'few bad days'],
+        plain: 'At 99% over two years there are only about five bad days to learn from.',
+        detail: 'Two years is about 504 trading days, so the worst 1% is about 5 days. Estimates built on so few days jump around. The page shows the tail day count and a "low confidence" badge when it is below 10. A longer window gives more bad days but mixes in older market conditions.',
+      },
+      {
+        term: 'Maximum drawdown', tag: 'Portfolio',
+        synonyms: ['drawdown', 'peak to trough', 'underwater', 'biggest fall', 'max drawdown'],
+        plain: 'The largest fall from a high point to a later low.',
+        detail: 'Track the portfolio\'s value, keep the running high, and measure how far below it the value gets. The page shows the dates of the high and the low, whether the value recovered, and how many trading days it spent below the high. The window start counts as the first high.',
+        example: 'A portfolio that rises to 120, falls to 96 and later returns to 120 had a maximum drawdown of -20%.',
+      },
+      {
+        term: 'Beta and R squared', tag: 'Portfolio',
+        synonyms: ['beta', 'market sensitivity', 'r2', 'r-squared', 'spy beta', 'market risk'],
+        plain: 'How much the portfolio tends to move when the market moves.',
+        detail: 'Beta is the covariance of portfolio returns with SPY returns divided by the variance of SPY returns, over the same window. 1.2 means moves about 20% bigger than the market on average. R squared says how much of the portfolio\'s movement SPY explains. The page uses SPY (an ETF that tracks the S&P 500) as the benchmark.',
+      },
+      {
+        term: 'Risk contribution', tag: 'Portfolio',
+        synonyms: ['risk share', 'marginal risk', 'euler decomposition', 'where the risk comes from', 'risk budget'],
+        plain: "Each stock's share of the portfolio's total volatility.",
+        detail: 'A stock\'s share is its weight times its volatility times how closely it moves with the rest of the portfolio. The shares add up to exactly 100%. A stock can be 10% of the money and 25% of the risk. The "bad days" view instead splits the expected shortfall: how much each stock lost on the portfolio\'s worst days.',
+      },
+      {
+        term: 'Correlation and effective holdings', tag: 'Portfolio',
+        synonyms: ['correlation', 'diversification', 'effective n', 'hhi', 'concentration', 'herfindahl'],
+        plain: 'How closely stocks move together, and how concentrated the weights are.',
+        detail: 'Correlation runs from -1 to 1 (Pearson, on daily returns). Effective holdings is 1 divided by the sum of squared weights: how many equal-sized positions would give the same concentration. Ten stocks with one huge weight can behave like three. Correlations tend to rise in sell-offs, so diversification helps least when it is needed most.',
+      },
+      {
+        term: 'Stress tests and survivorship bias', tag: 'Portfolio',
+        synonyms: ['stress test', 'scenario', 'covid crash', 'historical replay', 'survivorship bias', 'sell-off'],
+        plain: 'What your current mix would have done in real past sell-offs.',
+        detail: 'Each replay takes your weights at the start of the window and holds them to the end with no rebalancing, so each stock\'s contribution is its weight times its own return and they add up to the portfolio return. Stocks with no price at the start are left out and the rest scaled up, with coverage shown. The stocks are today\'s S&P 500 members, so companies that were removed or failed are missing, and past sell-offs look milder than they were.',
+        example: 'In the 2020 COVID crash window (Feb 19 to Mar 23), SPY fell about 34%.',
+      },
+      {
+        term: 'Hypothetical shocks', tag: 'Portfolio',
+        synonyms: ['market shock', 'sector shock', 'reverse stress', 'what if', 'beta approximation'],
+        plain: 'Rough what-ifs: if the market or one sector falls by a set amount.',
+        detail: 'The market estimate is portfolio beta times the market move. The sector shock applies the fall straight to the stocks in that sector and leaves the rest flat. The reverse stress divides a target loss by beta. All three are approximations that assume betas stay the same, which they often do not in real crises.',
+      },
+      {
+        term: 'Data, windows and method version', tag: 'Method',
+        synonyms: ['adjusted close', 'total return', 'window', 'constant weights', 'rebalanced daily', 'methodology version', 'data source'],
+        plain: 'Where the numbers come from and the rules behind them.',
+        detail: 'Prices are daily closes adjusted for splits and dividends (Yahoo Finance), so returns include dividends. Returns are simple daily returns, and the portfolio is rebalanced to constant weights each day; a buy-and-hold view is offered for the growth chart. The default window is 2 years (504 trading days), with at least 120 usable days required, and a stock must have returns on at least 90% of the window or it is named and left out. A year is 252 trading days. Everything is historical and educational. This is methodology version 1.0.0.',
+      },
+    ],
+  },
+  {
     id: 'limitations', icon: Shield, title: 'Important Limitations', color: '#8b949e',
     summary: 'What these models cannot predict and why this is educational only.',
     concepts: [
@@ -595,15 +672,21 @@ const D = {
 
 // ─── Category cards config (mirrors Stitch bento grid) ────────────────────────
 
+const CONCEPT_COUNT = (id: string) => {
+  const n = SECTIONS.find(sec => sec.id === id)?.concepts.length ?? 0
+  return `${n} ${n === 1 ? 'Concept' : 'Concepts'}`
+}
+
 const CATEGORY_CARDS = [
-  { id: 'basics',       label: 'Basics',       sub: 'Core terminal mechanics.',       count: '12 Concepts',  icon: '⬡',  color: '#adc6ff' },
-  { id: 'risk',         label: 'Risk',          sub: 'Volatility and downside.',       count: '8 Concepts',   icon: '△',  color: '#F59E0B' },
-  { id: 'forecast',     label: 'Models',        sub: 'Neural & Bayesian paths.',       count: '15 Concepts',  icon: '⬖',  color: '#d0bcff' },
-  { id: 'errors',       label: 'Metrics',       sub: 'Accuracy & Signal error.',       count: '21 Concepts',  icon: '▦',  color: '#60A5FA' },
-  { id: 'price',        label: 'Sectors',       sub: 'Taxonomy and clusters.',         count: '6 Concepts',   icon: '⬡',  color: '#34D399' },
-  { id: 'fundamentals', label: 'Forecasting',   sub: 'Temporal logic & Drift.',        count: '10 Concepts',  icon: '∿',  color: '#A78BFA' },
-  { id: 'limitations',  label: 'Compliance',    sub: 'Guardrails & Ethics.',           count: '4 Concepts',   icon: '◎',  color: '#F87171' },
-  { id: 'signals',      label: 'Guides',        sub: 'Step-by-step flows.',            count: '5 Tutorials',  icon: '◫',  color: '#adc6ff', highlighted: true },
+  { id: 'basics',       label: 'Basics',        sub: 'Stocks, indices, tickers, sectors.',   count: CONCEPT_COUNT('basics'),       icon: '⬡',  color: '#adc6ff' },
+  { id: 'risk',         label: 'Risk',          sub: 'Volatility and risk levels.',          count: CONCEPT_COUNT('risk'),         icon: '△',  color: '#F59E0B' },
+  { id: 'forecast',     label: 'Models',        sub: 'Naive, momentum and trend models.',    count: CONCEPT_COUNT('forecast'),     icon: '⬖',  color: '#d0bcff' },
+  { id: 'errors',       label: 'Metrics',       sub: 'MAE, RMSE and MAPE.',                  count: CONCEPT_COUNT('errors'),       icon: '▦',  color: '#60A5FA' },
+  { id: 'price',        label: 'Returns',       sub: 'Price and return metrics.',            count: CONCEPT_COUNT('price'),        icon: '⬡',  color: '#34D399' },
+  { id: 'fundamentals', label: 'Fundamentals',  sub: 'Margins, revenue and income.',         count: CONCEPT_COUNT('fundamentals'), icon: '∿',  color: '#A78BFA' },
+  { id: 'limitations',  label: 'Limits',        sub: 'What the models cannot do.',           count: CONCEPT_COUNT('limitations'),  icon: '◎',  color: '#F87171' },
+  { id: 'signals',      label: 'Signals',       sub: 'Dashboard labels explained.',          count: CONCEPT_COUNT('signals'),      icon: '◫',  color: '#adc6ff', highlighted: true },
+  { id: 'portfolio',    label: 'Portfolio risk', sub: 'How the Portfolio page measures risk: VaR, drawdown, stress tests and their limits.', count: CONCEPT_COUNT('portfolio'), icon: '◈', color: '#c6c0ff', wide: true },
 ]
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -785,7 +868,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
               </div>
             </div>
 
-            {/* 2×4 bento grid */}
+            {/* Category grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {CATEGORY_CARDS.map(card => {
                 const isActive = openSection === card.id
@@ -795,6 +878,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
                   <button key={card.id}
                     onClick={() => setOpenSection(openSection === card.id ? '' : card.id)}
                     style={{
+                      gridColumn: card.wide ? '1 / -1' : undefined,
                       textAlign: 'left', padding: 20,
                       background: isActive ? `${card.color}15` : idleBg,
                       border: `1px solid ${isActive ? card.color : idleBorder}`,
