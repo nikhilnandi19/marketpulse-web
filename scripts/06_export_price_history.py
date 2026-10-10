@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -30,6 +31,9 @@ import yfinance as yf
 
 TICKER_SOURCE_PATH = Path("public/data/marketpulse_dashboard_company_summary.csv")
 OUT_DIR = Path("public/data/risk")
+# Everything is built here first and swapped into OUT_DIR only if every check passes,
+# so a failed run can never leave new prices next to an old calendar.
+BUILD_DIR = Path("public/data/risk_build")
 BENCHMARK = "SPY"
 HISTORY_START = "2017-12-01"  # buffer so the first 2018 return exists
 CHUNK_SIZE = 60
@@ -117,10 +121,9 @@ def main() -> int:
     closes.index = pd.DatetimeIndex(closes.index).tz_localize(None).normalize()
     closes = closes.loc[:, ~closes.columns.duplicated()]
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "prices").mkdir(exist_ok=True)
-    for old in (OUT_DIR / "prices").glob("*.json"):
-        old.unlink()
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
+    (BUILD_DIR / "prices").mkdir(parents=True)
 
     skipped: dict[str, str] = {}
     suspect: list[dict] = []
@@ -147,18 +150,19 @@ def main() -> int:
         if last_valid_idx < len(calendar) - 1 - MAX_STALE_TRADING_DAYS:
             skipped[sym] = f"last price {calendar[last_valid_idx].date()} (stopped trading)"
             continue
-        (OUT_DIR / "prices" / f"{sym}.json").write_text(json.dumps(payload, separators=(",", ":")))
+        (BUILD_DIR / "prices" / f"{sym}.json").write_text(json.dumps(payload, separators=(",", ":")))
         written += 1
 
     skipped_share = len(skipped) / len(symbols)
     if skipped_share > MAX_SKIPPED_SHARE:
         print(f"ERROR: {len(skipped)} of {len(symbols)} symbols skipped ({skipped_share:.1%}).", file=sys.stderr)
         print(json.dumps(skipped, indent=2), file=sys.stderr)
+        shutil.rmtree(BUILD_DIR, ignore_errors=True)
         return 1
 
-    (OUT_DIR / "calendar.json").write_text(json.dumps([d.strftime("%Y-%m-%d") for d in calendar], separators=(",", ":")))
+    (BUILD_DIR / "calendar.json").write_text(json.dumps([d.strftime("%Y-%m-%d") for d in calendar], separators=(",", ":")))
     bench_payload = series_payload(BENCHMARK, bench_close, calendar)
-    (OUT_DIR / "benchmark.json").write_text(json.dumps(bench_payload, separators=(",", ":")))
+    (BUILD_DIR / "benchmark.json").write_text(json.dumps(bench_payload, separators=(",", ":")))
     meta = {
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": "Yahoo Finance via yfinance, auto_adjust=True (split- and dividend-adjusted close)",
@@ -171,7 +175,12 @@ def main() -> int:
         "symbols_skipped": skipped,
         "symbols_with_suspect_jumps": suspect,
     }
-    (OUT_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
+    (BUILD_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
+
+    # All checks passed and every file is written: swap the finished set into place.
+    if OUT_DIR.exists():
+        shutil.rmtree(OUT_DIR)
+    BUILD_DIR.rename(OUT_DIR)
     print(f"Wrote {written} tickers, {len(calendar)} days ({meta['first_date']} to {meta['last_date']}).")
     print(f"Skipped {len(skipped)}: {skipped}")
     print(f"Suspect jumps (>50% in a day): {suspect}")

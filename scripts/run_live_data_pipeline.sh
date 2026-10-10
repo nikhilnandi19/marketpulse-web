@@ -111,6 +111,10 @@ print("  Outcome status distribution:", snapshots["outcome_status"].value_counts
 PY
 
 echo "Step 8: Export adjusted price history for the Portfolio risk page"
-python scripts/06_export_price_history.py
+# Not allowed to fail the whole run: the forecast CSVs above must still be committed.
+# The export is all-or-nothing, so on failure the Portfolio keeps yesterday's prices.
+if ! python scripts/06_export_price_history.py; then
+  echo "::warning::Price history export failed. Portfolio prices were not refreshed today; forecast data was."
+fi
 
 echo "MarketPulse live data pipeline completed."
