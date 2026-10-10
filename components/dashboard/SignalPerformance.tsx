@@ -57,11 +57,11 @@ function glass(extra: React.CSSProperties = {}): React.CSSProperties {
 
 // ─── Format helpers ─────────────────────────────────────────────────────────────
 function fmtPctSigned(v: number | null | undefined): string {
-  if (v == null || isNaN(v)) return '—'
+  if (v == null || isNaN(v)) return 'n/a'
   return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 }
 function fmtHitRate(v: number | null | undefined): string {
-  if (v == null || isNaN(v)) return '—'
+  if (v == null || isNaN(v)) return 'n/a'
   return `${v.toFixed(1)}%`
 }
 function pctColor(v: number | null | undefined): string {
@@ -79,7 +79,7 @@ function resolveSignal(row: SignalSnapshot): string {
   if (ok(row.final_signal))      return row.final_signal
   if (ok(row.investment_signal)) return row.investment_signal
   if (ok(row.forecast_signal))   return row.forecast_signal
-  return '—'
+  return 'n/a'
 }
 
 // Glowing dot color per signal category
@@ -211,7 +211,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ResultCell({ ret, hit }: { ret: number | null; hit: number | null }) {
-  if (ret == null) return <span style={{ color: D.textMuted, fontSize: 11, fontFamily: D.mono }}>—</span>
+  if (ret == null) return <span style={{ color: D.textMuted, fontSize: 11, fontFamily: D.mono }}>n/a</span>
   const color = hit === 1 ? D.teal : hit === 0 ? D.red : D.textSec
   const icon  = hit === 1 ? '✓ '  : hit === 0 ? '✗ '  : ''
   return (
@@ -268,8 +268,8 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
         { label: 'Unique Dates',    value: stats.uniqueDates.toString(),                 color: D.text,    Icon: Calendar     },
         { label: 'Pending',         value: stats.pending.toLocaleString(),               color: D.warning, Icon: Clock        },
         { label: 'Complete 30D',    value: stats.complete.toLocaleString(),              color: stats.complete > 0 ? D.teal : D.textMuted, Icon: CheckCircle2 },
-        { label: '30D Hit Rate',    value: stats.hitRate30 != null ? `${stats.hitRate30.toFixed(1)}%` : '—', color: hitColor(stats.hitRate30), Icon: TrendingUp },
-        { label: 'Avg 30D Return',  value: stats.avgRet30  != null ? fmtPctSigned(stats.avgRet30) : '—',  color: pctColor(stats.avgRet30),  Icon: BarChart2   },
+        { label: '30D Hit Rate',    value: stats.hitRate30 != null ? `${stats.hitRate30.toFixed(1)}%` : 'n/a', color: hitColor(stats.hitRate30), Icon: TrendingUp },
+        { label: 'Avg 30D Return',  value: stats.avgRet30  != null ? fmtPctSigned(stats.avgRet30) : 'n/a',  color: pctColor(stats.avgRet30),  Icon: BarChart2   },
       ]
     : []
 
@@ -438,7 +438,7 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
                             boxShadow: `0 0 6px ${dotColor}90`,
                           }} />
                           <span style={{ color: D.text, fontWeight: 500, fontSize: 13 }}>
-                            {row.signal_category || '—'}
+                            {row.signal_category || 'n/a'}
                           </span>
                         </div>
                       </Td>
@@ -496,7 +496,7 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
                         fontSize: 12, color: D.textSec,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {row.sector || '—'}
+                        {row.sector || 'n/a'}
                       </div>
                       {/* Progress bar */}
                       <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 999, overflow: 'hidden' }}>
@@ -552,7 +552,7 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
                             padding: '3px 10px', borderRadius: 999,
                             textTransform: 'uppercase' as const, letterSpacing: '0.06em',
                           }}>
-                            {row.risk_level || '—'}
+                            {row.risk_level || 'n/a'}
                           </span>
                         </Td>
                         <Td right mono>
@@ -617,15 +617,15 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
                     <Td mono>
-                      <span style={{ color: D.textMuted }}>{row.snapshot_date || '—'}</span>
+                      <span style={{ color: D.textMuted }}>{row.snapshot_date || 'n/a'}</span>
                     </Td>
                     <Td>
                       <span style={{ fontFamily: D.mono, fontWeight: 700, fontSize: 13, color: D.text }}>
-                        {row.symbol || '—'}
+                        {row.symbol || 'n/a'}
                       </span>
                     </Td>
                     <Td right mono>
-                      {row.latest_close != null ? `$${row.latest_close.toFixed(2)}` : '—'}
+                      {row.latest_close != null ? `$${row.latest_close.toFixed(2)}` : 'n/a'}
                     </Td>
                     <Td right mono>
                       <span style={{ color: pctColor(row.forecast_30d_upside_pct) }}>
@@ -633,7 +633,7 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
                       </span>
                     </Td>
                     <Td>
-                      {sig !== '—' ? (
+                      {sig !== 'n/a' ? (
                         <span style={{
                           fontSize: 10, fontFamily: D.mono,
                           color: chip.color, background: chip.bg,
@@ -644,11 +644,11 @@ export default function SignalPerformance({ snapshots, summary, bySector, byRisk
                           {chip.label}
                         </span>
                       ) : (
-                        <span style={{ color: D.textMuted, fontSize: 12 }}>—</span>
+                        <span style={{ color: D.textMuted, fontSize: 12 }}>n/a</span>
                       )}
                     </Td>
                     <Td>
-                      <span style={{ fontSize: 12, color: D.textMuted }}>{row.risk_level || '—'}</span>
+                      <span style={{ fontSize: 12, color: D.textMuted }}>{row.risk_level || 'n/a'}</span>
                     </Td>
                     <Td right>
                       <ResultCell ret={row.return_5d_pct} hit={row.hit_5d} />

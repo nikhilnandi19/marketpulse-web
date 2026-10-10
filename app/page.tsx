@@ -13,6 +13,8 @@ import SignalPerformance from '@/components/dashboard/SignalPerformance'
 import WatchlistDashboard from '@/components/dashboard/WatchlistDashboard'
 import PortfolioDashboard from '@/components/portfolio/PortfolioDashboard'
 import { useWatchlist } from '@/lib/useWatchlist'
+import { RISK_LAB, LIST_NAME } from '@/lib/riskLab'
+import { isShareHash } from '@/lib/risk'
 import {
   loadCompanySummary, loadSectorSummary, loadKPIs,
   loadActualVsPredicted, loadFutureForecast,
@@ -24,13 +26,10 @@ import type {
   SignalSnapshot, SignalPerformanceSummary, SignalPerformanceBySector, SignalPerformanceByRisk,
 } from '@/lib/types'
 
-// Portfolio risk lab is behind a flag until it reaches parity with the Watchlist.
-const RISK_LAB = process.env.NEXT_PUBLIC_RISK_LAB === '1'
-
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Activity },
   { id: 'explorer',  label: 'Explorer',  icon: BarChart2 },
-  { id: 'watchlist', label: RISK_LAB ? 'Portfolio' : 'Watchlist',  icon: Bookmark },
+  { id: 'watchlist', label: LIST_NAME,  icon: Bookmark },
   { id: 'forecast',  label: 'Forecast',  icon: GitBranch },
   { id: 'sector', label: 'Sector', icon: Globe },
   { id: 'matrix', label: 'Risk Matrix', icon: Crosshair },
@@ -98,7 +97,7 @@ function heroSignal(signal: string): { label: string; color: string } {
 }
 
 export default function Home() {
-  const { symbols: watchedSymbols, toggle: toggleWatchlist } = useWatchlist()
+  const { symbols: watchedSymbols, toggle: toggleWatchlist, replaceAll: replaceWatchlist, mounted: watchlistReady } = useWatchlist()
   const [activeTab, setActiveTab] = useState<string | null>(null)
 
   // Switch tab and always scroll to the top of the page so the user
@@ -106,6 +105,14 @@ export default function Home() {
   const switchTab = useCallback((tab: string | null) => {
     setActiveTab(tab)
     window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+  // Opening a shared portfolio link goes straight to the Portfolio tab.
+  useEffect(() => {
+    if (!RISK_LAB) return
+    const open = () => { if (isShareHash(window.location.hash)) setActiveTab('watchlist') }
+    open()
+    window.addEventListener('hashchange', open)
+    return () => window.removeEventListener('hashchange', open)
   }, [])
   const [companies, setCompanies] = useState<CompanySummary[]>([])
   const [sectors, setSectors] = useState<SectorSummary[]>([])
@@ -123,6 +130,24 @@ export default function Home() {
   const [aiDefaultQuestion, setAiDefaultQuestion] = useState<string | undefined>(undefined)
   const ctaPanelRef = useRef<HTMLDivElement>(null)
   useGlassTilt(ctaPanelRef)
+
+  // Numbers for the homepage previews come from the loaded data, never typed in by hand.
+  const home = useMemo(() => {
+    const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN)
+    const sample = ['TJX', 'QCOM', 'MSFT', 'ALB'].map(sym => companies.find(c => c.symbol === sym)).filter((c): c is CompanySummary => !!c)
+    const signals = [
+      { name: 'Potential Opportunity', key: 'Potential Opportunity', color: '#4edea3' },
+      { name: 'Stable Watchlist', key: 'Stable Watchlist', color: '#adc6ff' },
+      { name: 'High Vol. Speculative', key: 'High Volatility Speculative', color: '#fb923c' },
+      { name: 'Needs Review', key: 'Needs Further Review', color: '#8c909f' },
+      { name: 'Weak / Negative', key: 'Weak Fundamentals / Negative Forecast', color: '#f87171' },
+    ].map(sg => {
+      const rows = companies.filter(c => c.final_signal === sg.key)
+      return { ...sg, count: rows.length, upside: avg(rows.map(c => c.forecast_30d_upside_pct)) }
+    })
+    return { sample, sampleUpside: avg(sample.map(c => c.forecast_30d_upside_pct)), sampleVol: avg(sample.map(c => c.annualized_volatility_pct)), signals }
+  }, [companies])
+  const fmtSigned = (x: number) => (Number.isFinite(x) ? `${x >= 0 ? '+' : ''}${x.toFixed(1)}%` : 'n/a')
 
   useEffect(() => {
     async function loadAll() {
@@ -351,7 +376,7 @@ export default function Home() {
                   { l: 'Volatility', v: '31.8%', c: '#fb923c' },
                   { l: 'Avg MAPE', v: '1.55%', c: '#d0bcff' },
                   { l: 'Avg Upside', v: '+1.35%', c: '#4edea3' },
-                  { l: 'Companies', v: companies.length ? companies.length.toString() : '—', c: '#e2e2e2' },
+                  { l: 'Companies', v: companies.length ? companies.length.toString() : 'n/a', c: '#e2e2e2' },
                 ].map(({ l, v, c }) => (
                   <div key={l} style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '12px 16px' }}>
                     <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>{l}</div>
@@ -376,7 +401,7 @@ export default function Home() {
                     <span key={i} style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', paddingInline: 20, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'inline-flex', gap: 6 }}>
                       <span style={{ color: '#c2c6d6', fontWeight: 600 }}>{t.sym}</span>
                       <span style={{ color: t.loaded ? (t.up >= 0 ? '#4edea3' : '#f87171') : '#8c909f' }}>
-                        {t.loaded ? (t.up >= 0 ? '+' : '') + t.up.toFixed(1) + '%' : '—'}
+                        {t.loaded ? (t.up >= 0 ? '+' : '') + t.up.toFixed(1) + '%' : 'n/a'}
                       </span>
                     </span>
                   ))}
@@ -554,60 +579,99 @@ export default function Home() {
 
           <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '0 48px' }} />
 
-          {/* Watchlist */}
+          {/* Portfolio / Watchlist */}
           <section style={{ maxWidth: 1200, margin: '0 auto', padding: '80px 48px', display: 'grid', gridTemplateColumns: '5fr 4fr', gap: 80, alignItems: 'center' }}>
             {/* Visual left */}
             <div style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 24 }}>
-              {/* KPI tiles */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
-                {[
-                  { label: 'In Watchlist', value: '8', color: '#e2e2e2' },
-                  { label: 'Avg Upside',   value: '+4.9%', color: '#4edea3' },
-                  { label: 'Avg Vol',      value: '35.9%', color: '#fb923c' },
-                ].map(({ label, value, color }) => (
-                  <div key={label} style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'Inter, system-ui, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+              {RISK_LAB ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 18 }}>
+                    {[
+                      { label: 'Volatility', note: 'How bumpy the ride is, scaled to a year', color: '#d0bcff' },
+                      { label: '1-day VaR', note: 'The loss on the worst 1 in 20 days', color: '#fb923c' },
+                      { label: 'Max drawdown', note: 'The biggest fall from a high', color: '#f87171' },
+                      { label: 'Beta vs SPY', note: 'How much it moves with the market', color: '#adc6ff' },
+                    ].map(({ label, note, color }) => (
+                      <div key={label} style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
+                        <div style={{ fontSize: 12, color: '#8c909f', lineHeight: 1.45, fontFamily: 'Inter, system-ui, sans-serif' }}>{note}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {/* Table preview */}
-              <div style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 72px 88px', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  {['SYMBOL', 'COMPANY', '30D', 'RISK'].map(h => (
-                    <div key={h} style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em' }}>{h}</div>
-                  ))}
-                </div>
-                {[
-                  { sym: 'TJX',  name: 'The TJX Co.',  up: '+4.97%', risk: 'LOW',  rc: '#4edea3' },
-                  { sym: 'QCOM', name: 'QUALCOMM',      up: '+21.3%', risk: 'HIGH', rc: '#f87171' },
-                  { sym: 'MSFT', name: 'Microsoft',     up: '+2.1%',  risk: 'LOW',  rc: '#4edea3' },
-                  { sym: 'ALB',  name: 'Albemarle',     up: '-4.1%',  risk: 'HIGH', rc: '#f87171' },
-                ].map(({ sym, name, up, risk, rc }) => (
-                  <div key={sym} style={{ display: 'grid', gridTemplateColumns: '64px 1fr 72px 88px', padding: '11px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e2e2' }}>{sym}</span>
-                    <span style={{ fontSize: 11, color: '#8c909f', fontFamily: 'Inter, system-ui, sans-serif' }}>{name}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: up.startsWith('-') ? '#f87171' : '#4edea3' }}>{up}</span>
-                    <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: rc, background: `${rc}18`, border: `1px solid ${rc}30`, padding: '2px 7px', borderRadius: 9999 }}>{risk} RISK</span>
+                  <div style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em' }}>STRESS TESTS</div>
+                    {[
+                      ['Q4 2018 selloff', 'Sep to Dec 2018'],
+                      ['COVID crash', 'Feb to Mar 2020'],
+                      ['2022 rate bear market', 'Jan to Oct 2022'],
+                      ['2025 tariff selloff', 'Feb to Apr 2025'],
+                    ].map(([name, when]) => (
+                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ fontSize: 12, color: '#c2c6d6', fontFamily: 'Inter, system-ui, sans-serif' }}>{name}</span>
+                        <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f' }}>{when}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
+                    {[
+                      { label: 'Stocks shown', value: String(home.sample.length), color: '#e2e2e2' },
+                      { label: 'Avg Upside',   value: fmtSigned(home.sampleUpside), color: '#4edea3' },
+                      { label: 'Avg Vol',      value: Number.isFinite(home.sampleVol) ? `${home.sampleVol.toFixed(1)}%` : 'n/a', color: '#fb923c' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'Inter, system-ui, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 72px 88px', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      {['SYMBOL', 'COMPANY', '30D', 'RISK'].map(h => (
+                        <div key={h} style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em' }}>{h}</div>
+                      ))}
+                    </div>
+                    {home.sample.map(c => {
+                      const bucket = /high/i.test(c.risk_level) ? { t: 'HIGH', c: '#f87171' } : /low|lower/i.test(c.risk_level) ? { t: 'LOW', c: '#4edea3' } : /medium|moderate/i.test(c.risk_level) ? { t: 'MED', c: '#fabc42' } : { t: 'N/A', c: '#8c909f' }
+                      return (
+                        <div key={c.symbol} style={{ display: 'grid', gridTemplateColumns: '64px 1fr 72px 88px', padding: '11px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#e2e2e2' }}>{c.symbol}</span>
+                          <span style={{ fontSize: 11, color: '#8c909f', fontFamily: 'Inter, system-ui, sans-serif' }}>{c.company_name}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: c.forecast_30d_upside_pct < 0 ? '#f87171' : '#4edea3' }}>{fmtSigned(c.forecast_30d_upside_pct)}</span>
+                          <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: bucket.c, background: `${bucket.c}18`, border: `1px solid ${bucket.c}30`, padding: '2px 7px', borderRadius: 9999 }}>{bucket.t} RISK</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
             {/* Text right */}
             <div>
-              <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>Portfolio Tracking</div>
+              <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>{RISK_LAB ? 'Portfolio Risk' : 'Portfolio Tracking'}</div>
               <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, color: '#e2e2e2', fontFamily: 'Inter, system-ui, sans-serif', marginBottom: 16 }}>
-                My Watchlist
+                {RISK_LAB ? 'Portfolio' : 'My Watchlist'}
               </h2>
               <p style={{ fontSize: 15, color: '#8c909f', lineHeight: 1.65, marginBottom: 24 }}>
-                Add any S&P 500 company to a personal list and track their forecast, risk, and signal together. Saved locally in your browser, no account needed.
+                {RISK_LAB
+                  ? 'Put your S&P 500 stocks together and see how risky the mix is, where the risk comes from, and how it would have held up in past sell-offs. Saved in your browser, no account needed.'
+                  : 'Add any S&P 500 company to a personal list and track their forecast, risk, and signal together. Saved locally in your browser, no account needed.'}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                {[
-                  'Upside forecast, volatility, and signal for each stock',
-                  'Auto-generated summary with key highlights across your picks',
-                  'Sector exposure breakdown so you can spot concentration',
-                ].map(item => (
+                {(RISK_LAB
+                  ? [
+                      'Volatility, 1-day VaR, max drawdown and beta against SPY',
+                      'Which stocks carry most of the risk, and how closely they move together',
+                      'Replays of four real sell-offs, with every assumption stated',
+                    ]
+                  : [
+                      'Upside forecast, volatility, and signal for each stock',
+                      'Auto-generated summary with key highlights across your picks',
+                      'Sector exposure breakdown so you can spot concentration',
+                    ]
+                ).map(item => (
                   <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                     <span style={{ color: '#d0bcff', flexShrink: 0, fontSize: 10, marginTop: 3 }}>▸</span>
                     <span style={{ fontSize: 13, color: '#8c909f', lineHeight: 1.55 }}>{item}</span>
@@ -616,7 +680,7 @@ export default function Home() {
               </div>
               <button onClick={() => switchTab('watchlist')}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#d0bcff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, padding: 0 }}>
-                Explore Watchlist <ArrowUpRight size={14} />
+                {RISK_LAB ? 'Open Portfolio' : 'Explore Watchlist'} <ArrowUpRight size={14} />
               </button>
             </div>
           </section>
@@ -636,9 +700,9 @@ export default function Home() {
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
                 {[
-                  { label: 'Signals Tracked', value: '522',  color: '#e2e2e2' },
-                  { label: 'Eval Windows',     value: '3',    color: '#adc6ff' },
-                  { label: '30D Hit Rate',      value: 'Live', color: '#4edea3' },
+                  { label: 'Companies', value: companies.length ? String(companies.length) : 'n/a',  color: '#e2e2e2' },
+                  { label: 'Check Windows',     value: '3 (5, 10, 30 days)',    color: '#adc6ff' },
+                  { label: 'Snapshots Saved',   value: signalSnapshots.length ? String(signalSnapshots.length) : 'n/a', color: '#4edea3' },
                 ].map(({ label, value, color }) => (
                   <div key={label} style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '14px 16px' }}>
                     <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
@@ -655,13 +719,9 @@ export default function Home() {
             <div style={{ background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 24 }}>
               <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 16 }}>Signal Category Breakdown</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[
-                  { name: 'Potential Opportunity', count: 127, forecast: '+11.7%', color: '#4edea3' },
-                  { name: 'Stable Watchlist',       count: 172, forecast:  '+0.0%', color: '#adc6ff' },
-                  { name: 'High Vol. Speculative',  count:  17, forecast: '+16.7%', color: '#fb923c' },
-                  { name: 'Needs Review',            count: 159, forecast:  '+0.2%', color: '#8c909f' },
-                  { name: 'Weak / Negative',         count:  47, forecast:  '-7.5%', color: '#f87171' },
-                ].map(({ name, count, forecast, color }) => (
+                {home.signals.map(({ name, count, upside, color }) => {
+                  const forecast = fmtSigned(upside)
+                  return (
                   <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#1e2020', borderRadius: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
@@ -669,13 +729,14 @@ export default function Home() {
                     </div>
                     <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', minWidth: 24, textAlign: 'right' as const }}>{count}</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', color: forecast.startsWith('-') ? '#f87171' : forecast === '+0.0%' || forecast === '+0.2%' ? '#8c909f' : '#4edea3', minWidth: 52, textAlign: 'right' as const }}>{forecast}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', color: !Number.isFinite(upside) || Math.abs(upside) < 0.5 ? '#8c909f' : upside < 0 ? '#f87171' : '#4edea3', minWidth: 52, textAlign: 'right' as const }}>{forecast}</span>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
               <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#8c909f', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Avg forecast upside · outcomes tracked from day 1
+                Stocks per signal · avg 30-day forecast upside
               </div>
             </div>
           </section>
@@ -693,9 +754,9 @@ export default function Home() {
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 32, flexWrap: 'wrap' }}>
               {[
-                { label: 'API Documentation', icon: '↗' },
+                { label: 'Metric Definitions', icon: '↗' },
                 { label: 'Model Methodology', icon: '◎' },
-                { label: 'Data Governance', icon: '⚙' },
+                { label: 'Portfolio Risk Methods', icon: '⚙' },
               ].map(({ label, icon }) => (
                 <button key={label} onClick={() => switchTab('learn')}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c2c6d6', background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 20px', borderRadius: 6, cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -740,7 +801,7 @@ export default function Home() {
                 {[
                   { label: 'Overview', tab: 'overview' },
                   { label: 'Explorer',  tab: 'explorer' },
-                  { label: 'Watchlist', tab: 'watchlist' },
+                  { label: LIST_NAME, tab: 'watchlist' },
                   { label: 'Forecast',  tab: 'forecast' },
                   { label: 'Risk Matrix', tab: 'matrix' },
                   { label: 'Signal Performance', tab: 'signals' },
@@ -804,6 +865,8 @@ export default function Home() {
                   onViewForecast={navigateToForecast}
                   onViewAI={navigateToAI}
                   onNavigateToExplorer={() => switchTab('explorer')}
+                  onReplaceWatchlist={replaceWatchlist}
+                  listReady={watchlistReady}
                 />
               )}
               {activeTab === 'watchlist' && !RISK_LAB && (

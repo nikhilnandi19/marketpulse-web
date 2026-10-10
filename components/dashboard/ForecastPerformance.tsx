@@ -284,7 +284,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', width: '100%', border: `1px solid ${dropdownOpen ? C.adaptive.stroke : D.border}` }}>
             <div style={{ flex: 1, textAlign: 'left' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: D.text, fontFamily: D.mono }}>{selectedSymbol || '—'}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: D.text, fontFamily: D.mono }}>{selectedSymbol || 'n/a'}</span>
                 {company && <span style={{ fontSize: 12, color: D.textMuted, fontFamily: D.body }}>{company.company_name}</span>}
               </div>
               {company && (
@@ -688,10 +688,10 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 14, fontFamily: D.mono, color: D.text }}>{formatCurrency(row.price)}</td>
                       <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: D.mono, color: D.textMuted }}>
-                        {row.lower != null ? formatCurrency(row.lower) : '—'}
+                        {row.lower != null ? formatCurrency(row.lower) : 'n/a'}
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, fontFamily: D.mono, color: D.textMuted }}>
-                        {row.upper != null ? formatCurrency(row.upper) : '—'}
+                        {row.upper != null ? formatCurrency(row.upper) : 'n/a'}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
                         <ConfidenceBar mape={mape} />

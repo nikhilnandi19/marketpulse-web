@@ -305,7 +305,7 @@ export default function WatchlistDashboard({
                   <strong style={{ color: S.warning, fontStyle: 'normal' }}>{kpis.mostVol.annualized_volatility_pct.toFixed(1)}%</strong>
                   ). The watchlist is most exposed to{' '}
                   <strong style={{ color: S.primary, textDecoration: 'underline', fontStyle: 'normal', cursor: 'default' }}>
-                    {sectorBreakdown[0]?.sector ?? '—'}
+                    {sectorBreakdown[0]?.sector ?? 'n/a'}
                   </strong>."
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${S.divider}` }}>

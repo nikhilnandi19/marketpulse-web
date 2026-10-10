@@ -702,7 +702,7 @@ export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void })
 
   const activeSection = openSection ? SECTIONS.find(s => s.id === openSection) ?? null : null
 
-  // All concepts for deep dive list (filtered by section tile + institutional toggle)
+  // All concepts for deep dive list (filtered by section tile + advanced toggle)
   const deepDiveConcepts = useMemo(() => {
     let concepts = ALL_CONCEPTS
     if (openSection) {

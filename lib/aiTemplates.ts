@@ -1,5 +1,5 @@
 /**
- * aiTemplates.ts — Deterministic, data-grounded analysis templates.
+ * aiTemplates.ts: Deterministic, data-grounded analysis templates.
  *
  * All functions are pure: input data → markdown string.
  * No external API calls, no AI, no randomness.
@@ -10,14 +10,15 @@
  *   - Always end with educational disclaimer
  */
 
+import { LIST_NAME } from './riskLab'
 import type { CompanySummary, SectorSummary, SignalSnapshot } from '@/lib/types'
 import { formatPercent, formatCurrency } from '@/lib/formatters'
 
 // ─── Local formatting helpers ─────────────────────────────────────────────────
 
-/** Safe number with fixed decimals — returns '—' for null/undefined/NaN */
+/** Safe number with fixed decimals, returns 'n/a' for null/undefined/NaN */
 function safeN(v: number | null | undefined, dec = 1): string {
-  if (v == null || !isFinite(v)) return '—'
+  if (v == null || !isFinite(v)) return 'n/a'
   return v.toFixed(dec)
 }
 
@@ -52,12 +53,12 @@ export function explainSignal(company: CompanySummary): string {
       `The adaptive momentum model forecasts a 30-day upside of **${formatPercent(forecast_30d_upside_pct)}**, ` +
       `model reliability is within acceptable bounds, and no significant fundamental concerns override the signal.` +
       (riskNorm(risk_level) === 'high'
-        ? ` However, ${symbol} also carries a **High Risk** classification — the upside signal should be interpreted cautiously given elevated volatility.`
+        ? ` However, ${symbol} also carries a **High Risk** classification, so the upside signal should be interpreted cautiously given elevated volatility.`
         : ''),
 
     'Stable Watchlist':
       `MarketPulse classifies **${symbol}** as **Stable Watchlist**. ` +
-      `The 30-day forecast indicates **${formatPercent(forecast_30d_upside_pct)}** expected movement — ` +
+      `The 30-day forecast indicates **${formatPercent(forecast_30d_upside_pct)}** expected movement, ` +
       `positive or near-neutral, but below the threshold for an Opportunity classification. ` +
       `No significant fundamental red flags are detected. The model may suggest monitoring rather than acting on this name near-term.`,
 
@@ -84,20 +85,20 @@ export function explainSignal(company: CompanySummary): string {
 
   const lead =
     signalDescriptions[final_signal] ??
-    `MarketPulse assigns **${symbol}** the signal: **${final_signal || '—'}**.`
+    `MarketPulse assigns **${symbol}** the signal: **${final_signal || 'n/a'}**.`
 
   return [
-    `## Signal Explanation — ${symbol}`,
+    `## Signal Explanation: ${symbol}`,
     '',
     lead,
     '',
     '**Supporting data:**',
-    `- Final Signal: ${final_signal || '—'}`,
-    `- Forecast Signal: ${forecast_signal || '—'}`,
-    `- Fundamental Label: ${fundamental_label || '—'}`,
+    `- Final Signal: ${final_signal || 'n/a'}`,
+    `- Forecast Signal: ${forecast_signal || 'n/a'}`,
+    `- Fundamental Label: ${fundamental_label || 'n/a'}`,
     `- 30D Forecast Upside: ${formatPercent(forecast_30d_upside_pct)}`,
-    `- Risk Level: ${risk_level || '—'}`,
-    `- Model Reliability: ${model_reliability || '—'}`,
+    `- Risk Level: ${risk_level || 'n/a'}`,
+    `- Model Reliability: ${model_reliability || 'n/a'}`,
     ...(review_reason ? [`- Review Reason: ${review_reason}`] : []),
     DISCLAIMER,
   ].join('\n')
@@ -124,7 +125,7 @@ export function explainForecast(company: CompanySummary): string {
           `and should be considered alongside model reliability and risk level before interpretation.`
 
   return [
-    `## Forecast View — ${symbol}`,
+    `## Forecast View: ${symbol}`,
     '',
     `The model projects a 30-day forecast price of **${formatCurrency(forecast_30d_price)}** ` +
       `from a latest close of **${formatCurrency(latest_price)}**, ` +
@@ -136,8 +137,8 @@ export function explainForecast(company: CompanySummary): string {
     `- Latest Close: ${formatCurrency(latest_price)}`,
     `- 30D Forecast Price: ${formatCurrency(forecast_30d_price)}`,
     `- Forecast Upside: ${formatPercent(forecast_30d_upside_pct)}`,
-    `- Forecast Method: ${dashboard_forecast_method || '—'}`,
-    `- Best Model: ${best_model_name || '—'}`,
+    `- Forecast Method: ${dashboard_forecast_method || 'n/a'}`,
+    `- Best Model: ${best_model_name || 'n/a'}`,
     `- Model MAPE: ${safeN(best_model_mape, 2)}%`,
     ...(forecast_30d_date ? [`- Target Date: ${forecast_30d_date}`] : []),
     DISCLAIMER,
@@ -162,8 +163,8 @@ export function explainRisk(company: CompanySummary): string {
       `**${symbol}** is classified as **High Risk**. ` +
       `Annualized volatility is **${safeN(annualized_volatility_pct)}%**` +
       (secMed ? `, compared to a sector median of **${safeN(secMed)}%**` : '') +
-      `. This level of price variability means model forecasts carry greater uncertainty — ` +
-      `an unexpected market event or model error could significantly affect actual outcomes.`,
+      `. This level of price variability means model forecasts carry greater uncertainty, ` +
+      `and an unexpected market event or model error could significantly affect actual outcomes.`,
     mod:
       `**${symbol}** is classified as **Moderate Risk** with annualized volatility of ` +
       `**${safeN(annualized_volatility_pct)}%**` +
@@ -186,19 +187,19 @@ export function explainRisk(company: CompanySummary): string {
       : null
 
   return [
-    `## Risk View — ${symbol}`,
+    `## Risk View: ${symbol}`,
     '',
     riskDescriptions[norm],
     '',
     '**Risk data:**',
-    `- Risk Level: ${risk_level || '—'}`,
+    `- Risk Level: ${risk_level || 'n/a'}`,
     `- Annualized Volatility: ${safeN(annualized_volatility_pct)}%`,
     ...(secMed != null ? [`- Sector Median Volatility: ${safeN(secMed)}%`] : []),
     ...(volDiff !== null
       ? [`- Volatility vs Sector: ${volDiff >= 0 ? '+' : ''}${volDiff.toFixed(1)}%`]
       : []),
-    `- Sector Relative Risk: ${sector_relative_risk || '—'}`,
-    `- Signal: ${final_signal || '—'}`,
+    `- Sector Relative Risk: ${sector_relative_risk || 'n/a'}`,
+    `- Signal: ${final_signal || 'n/a'}`,
     DISCLAIMER,
   ].join('\n')
 }
@@ -215,7 +216,7 @@ export function explainReliability(company: CompanySummary): string {
     mape < 1        ? `MAPE of **${safeN(mape, 2)}%** is exceptionally low, indicating very tight recent forecast error.` :
     mape < 2        ? `MAPE of **${safeN(mape, 2)}%** is strong, indicating low recent forecast error.` :
     mape < 5        ? `MAPE of **${safeN(mape, 2)}%** is acceptable, within a typical range for statistical price models.` :
-    mape < 10       ? `MAPE of **${safeN(mape, 2)}%** is elevated — the model may have struggled with recent price patterns.` :
+    mape < 10       ? `MAPE of **${safeN(mape, 2)}%** is elevated, so the model may have struggled with recent price patterns.` :
                       `MAPE of **${safeN(mape, 2)}%** is high, which may reduce confidence in the 30-day forecast.`
 
   const reliabilityContext: Record<string, string> = {
@@ -224,7 +225,7 @@ export function explainReliability(company: CompanySummary): string {
     'Strong Reliability':
       `Model reliability is rated **Strong Reliability** for ${symbol}. The best-performing model has demonstrated consistent forecast accuracy in the recent test window.`,
     'Acceptable Reliability':
-      `Model reliability is rated **Acceptable Reliability** for ${symbol}. Forecasts are usable but carry moderate uncertainty — combine with volatility and risk context when interpreting.`,
+      `Model reliability is rated **Acceptable Reliability** for ${symbol}. Forecasts are usable but carry moderate uncertainty, so combine with volatility and risk context when interpreting.`,
     'High Error':
       `Model reliability is rated **High Error** for ${symbol}. The best-performing model has shown meaningful deviations from actual prices in the recent test window. Treat forecast numbers with extra caution.`,
     'Very High Error':
@@ -233,20 +234,20 @@ export function explainReliability(company: CompanySummary): string {
 
   const reliabilityDesc =
     reliabilityContext[model_reliability ?? ''] ??
-    `Model reliability is classified as **${model_reliability || '—'}** for ${symbol}.`
+    `Model reliability is classified as **${model_reliability || 'n/a'}** for ${symbol}.`
 
   return [
-    `## Model Reliability — ${symbol}`,
+    `## Model Reliability: ${symbol}`,
     '',
     reliabilityDesc,
     '',
     mapeNote,
     '',
     '**Reliability data:**',
-    `- Model Reliability: ${model_reliability || '—'}`,
-    `- Best Model: ${best_model_name || '—'}`,
+    `- Model Reliability: ${model_reliability || 'n/a'}`,
+    `- Best Model: ${best_model_name || 'n/a'}`,
     `- Model MAPE: ${safeN(mape, 2)}%`,
-    `- Forecast Method: ${dashboard_forecast_method || '—'}`,
+    `- Forecast Method: ${dashboard_forecast_method || 'n/a'}`,
     '',
     '**What MAPE means:**',
     '- MAPE (Mean Absolute Percentage Error) measures average absolute forecast error as a percentage of actual price',
@@ -267,7 +268,7 @@ export function explainSectorContext(
 
   if (!sector) {
     return [
-      `## Sector Context — ${symbol}`,
+      `## Sector Context: ${symbol}`,
       '',
       `Sector comparison is unavailable for **${symbol}** (${sectorName || 'Unknown sector'}). ` +
         `Sector-level aggregates may not be loaded or ${sectorName} is not represented in the current sector summary.`,
@@ -313,22 +314,22 @@ export function explainSectorContext(
       : 'Volatility comparison to sector is unavailable.'
 
   return [
-    `## Sector Context — ${symbol} vs ${sectorLabel}`,
+    `## Sector Context: ${symbol} vs ${sectorLabel}`,
     '',
     upsideComparison,
     '',
     volComparison,
     '',
     `**${sectorLabel} sector breakdown:**`,
-    `- Companies tracked: ${number_of_companies ?? '—'}`,
+    `- Companies tracked: ${number_of_companies ?? 'n/a'}`,
     `- Sector avg 30D upside: ${formatPercent(avg_forecast_30d_upside_pct)}`,
     `- Sector avg volatility: ${safeN(avg_annualized_volatility_pct)}%`,
     `- Sector avg MAPE: ${safeN(avg_model_mape, 2)}%`,
-    `- Potential Opportunity: ${potential_opportunity_count ?? '—'}`,
-    `- Stable Watchlist: ${stable_watchlist_count ?? '—'}`,
-    `- High Vol Speculative: ${high_volatility_speculative_count ?? '—'}`,
-    `- Weak / Negative: ${weak_negative_count ?? '—'}`,
-    `- Needs Review: ${needs_further_review_count ?? '—'}`,
+    `- Potential Opportunity: ${potential_opportunity_count ?? 'n/a'}`,
+    `- Stable Watchlist: ${stable_watchlist_count ?? 'n/a'}`,
+    `- High Vol Speculative: ${high_volatility_speculative_count ?? 'n/a'}`,
+    `- Weak / Negative: ${weak_negative_count ?? 'n/a'}`,
+    `- Needs Review: ${needs_further_review_count ?? 'n/a'}`,
     DISCLAIMER,
   ].join('\n')
 }
@@ -349,17 +350,17 @@ export function explainWatchlistContext(
       : null
 
   const watchStatus = isWatched
-    ? `**${symbol} (${company_name})** is currently in your **Watchlist**. ` +
+    ? `**${symbol} (${company_name})** is currently in your **${LIST_NAME}**. ` +
       `You are actively tracking this company's signals, forecasts, and risk profile over time.`
-    : `**${symbol} (${company_name})** is **not currently in your Watchlist**. ` +
-      `Add it via the Company Explorer or Watchlist tabs to track it over time.`
+    : `**${symbol} (${company_name})** is **not currently in your ${LIST_NAME}**. ` +
+      `Add it via the Company Explorer or ${LIST_NAME} tabs to track it over time.`
 
   const snapshotLines: string[] = []
   if (latestSnap) {
     snapshotLines.push('', '**Signal tracking data:**')
     snapshotLines.push(`- Total signal snapshots recorded: ${companySnaps.length}`)
     snapshotLines.push(`- Latest snapshot date: ${latestSnap.snapshot_date}`)
-    snapshotLines.push(`- Outcome status: ${latestSnap.outcome_status || '—'}`)
+    snapshotLines.push(`- Outcome status: ${latestSnap.outcome_status || 'n/a'}`)
     snapshotLines.push(
       latestSnap.return_5d_pct !== null
         ? `- 5-day actual return: ${formatPercent(latestSnap.return_5d_pct)}`
@@ -375,7 +376,7 @@ export function explainWatchlistContext(
   }
 
   return [
-    `## Watchlist Context — ${symbol}`,
+    `## ${LIST_NAME} Context: ${symbol}`,
     '',
     watchStatus,
     ...snapshotLines,
@@ -425,43 +426,43 @@ export function generateStockMemo(
   if (upside !== null && upside < 0)
     bearPoints.push(`Model projects negative 30-day return of **${formatPercent(upside)}**`)
   if (norm === 'high')
-    bearPoints.push(`High Risk classification — annualized volatility **${safeN(vol)}%**`)
+    bearPoints.push(`High Risk classification, annualized volatility **${safeN(vol)}%**`)
   if (model_reliability === 'High Error' || model_reliability === 'Very High Error')
-    bearPoints.push(`Model reliability rated **${model_reliability}**${mape !== null ? ` (MAPE: ${safeN(mape, 2)}%)` : ''} — forecast confidence is limited`)
+    bearPoints.push(`Model reliability rated **${model_reliability}**${mape !== null ? ` (MAPE: ${safeN(mape, 2)}%)` : ''}, so forecast confidence is limited`)
   if (final_signal === 'Weak Fundamentals / Negative Forecast')
     bearPoints.push('Signal classified as **Weak Fundamentals / Negative Forecast**')
   if (final_signal === 'Needs Further Review')
     bearPoints.push(`Signal flagged **Needs Further Review**${review_reason ? `: ${review_reason}` : ''}`)
   if (final_signal === 'High Volatility Speculative')
-    bearPoints.push('High Volatility Speculative classification — elevated price swings reduce forecast reliability')
+    bearPoints.push('High Volatility Speculative classification: elevated price swings reduce forecast reliability')
   if (companySnaps.length === 0)
-    bearPoints.push('No signal tracking snapshots yet — forward return accuracy cannot be assessed')
+    bearPoints.push('No signal tracking snapshots yet: forward return accuracy cannot be assessed')
   if (bearPoints.length === 0)
     bearPoints.push('No material negative signals detected in the current model output')
 
   // ── Summary lines
   const forecastLine =
     `Latest close **${formatCurrency(latest_price)}** → 30D target **${formatCurrency(forecast_30d_price)}** (**${formatPercent(upside)}**). ` +
-    `Method: ${dashboard_forecast_method || '—'}.`
+    `Method: ${dashboard_forecast_method || 'n/a'}.`
 
   const reliabilityLine =
     mape !== null
-      ? `${model_reliability || '—'}, MAPE **${safeN(mape, 2)}%**. ` +
-        (mape < 2 ? 'Strong model accuracy.' : mape < 5 ? 'Acceptable model accuracy.' : 'Elevated model error — treat forecast as directional guidance.')
-      : `${model_reliability || '—'}. MAPE unavailable.`
+      ? `${model_reliability || 'n/a'}, MAPE **${safeN(mape, 2)}%**. ` +
+        (mape < 2 ? 'Strong model accuracy.' : mape < 5 ? 'Acceptable model accuracy.' : 'Elevated model error: treat forecast as directional guidance.')
+      : `${model_reliability || 'n/a'}. MAPE unavailable.`
 
   return [
-    `## Stock Memo — ${symbol}`,
+    `## Stock Memo: ${symbol}`,
     '',
     `**Company:** ${company_name} (${symbol})`,
-    `**Sector:** ${sectorName || '—'}`,
-    `**Watchlist:** ${isWatched ? '★ Currently in Watchlist' : 'Not in Watchlist'}`,
+    `**Sector:** ${sectorName || 'n/a'}`,
+    `**${LIST_NAME}:** ${isWatched ? `Currently in ${LIST_NAME}` : `Not in ${LIST_NAME}`}`,
     '',
-    `**Current MarketPulse Signal:** ${final_signal || '—'}`,
+    `**Current MarketPulse Signal:** ${final_signal || 'n/a'}`,
     '',
     `**Forecast View:** ${forecastLine}`,
     '',
-    `**Risk View:** ${risk_level || '—'}, annualized volatility **${safeN(vol)}%**.`,
+    `**Risk View:** ${risk_level || 'n/a'}, annualized volatility **${safeN(vol)}%**.`,
     '',
     `**Reliability View:** ${reliabilityLine}`,
     '',
