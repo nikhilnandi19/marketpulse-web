@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Plus, Trash2, Share2, Bot } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Share2, Bot, Link2, Download } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { CompanySummary } from '@/lib/types'
-import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, SCENARIOS, WINDOWS, computeFlags, type WindowKey } from '@/lib/risk'
+import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, SCENARIOS, WINDOWS, computeFlags, decodeShare, encodeShare, metricsCsv, type SharedPortfolio, type WindowKey } from '@/lib/risk'
 import { usePortfolio, type Confidence } from '@/lib/usePortfolio'
 import { S, glass, fmtPct, fmtDate, fmtMoney, pctColor, labelStyle } from './tokens'
 import RiskContribution, { type ContributionMode } from './RiskContribution'
@@ -12,6 +12,9 @@ import CorrelationHeatmap from './CorrelationHeatmap'
 import Diversification from './Diversification'
 import Flags from './Flags'
 import StressTests from './StressTests'
+import ForecastRisk from './ForecastRisk'
+import { useNarrow } from './useNarrow'
+import { LIST_NAME_LOWER } from '@/lib/riskLab'
 import { RollingCorrelationChart, RollingVolChart } from './RollingCharts'
 
 interface Props {
@@ -21,6 +24,10 @@ interface Props {
   onViewForecast: (c: CompanySummary) => void
   onViewAI: (c: CompanySummary) => void
   onNavigateToExplorer: () => void
+  /** Replace the saved list of stocks (used when opening a shared link). */
+  onReplaceWatchlist: (symbols: string[]) => void
+  /** True once the saved list has been read from the browser. */
+  listReady: boolean
 }
 
 const EXAMPLE = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'JPM', 'XOM', 'JNJ']
@@ -41,7 +48,7 @@ function Segmented<T extends string | number>({ label, value, options, onChange 
         {options.map(o => {
           const on = o.value === value
           return (
-            <button key={String(o.value)} aria-pressed={on} onClick={() => onChange(o.value)}
+            <button className="pf-tap" key={String(o.value)} aria-pressed={on} onClick={() => onChange(o.value)}
               style={{ minHeight: 32, minWidth: 44, padding: '0 12px', borderRadius: 9999, border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600,
                 background: on ? `${S.primary}26` : 'transparent', color: on ? S.primary : S.textMuted }}>
               {o.text}
@@ -77,6 +84,7 @@ function WeightInput({ value, onCommit, symbol }: { value: number; onCommit: (v:
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       <input
+        className="pf-tap"
         aria-label={`Weight for ${symbol} in percent`}
         inputMode="decimal"
         value={text}
@@ -114,7 +122,7 @@ function Notice({ children, tone = 'info' }: { children: React.ReactNode; tone?:
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export default function PortfolioDashboard({ companies, watchedSymbols, onToggleWatchlist, onViewForecast, onViewAI, onNavigateToExplorer }: Props) {
+export default function PortfolioDashboard({ companies, watchedSymbols, onToggleWatchlist, onViewForecast, onViewAI, onNavigateToExplorer, onReplaceWatchlist, listReady }: Props) {
   const byTicker = useMemo(() => {
     const m: Record<string, CompanySummary> = {}
     companies.forEach(c => (m[c.symbol] = c))
@@ -133,6 +141,78 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
   const [query, setQuery] = useState('')
   const [contribMode, setContribMode] = useState<ContributionMode>('vol')
   const [hovered, setHovered] = useState<string | null>(null)
+  const narrow = useNarrow()
+
+  // ── Share link: read on open, write on Copy link ──
+  const [pending, setPending] = useState<{ value: SharedPortfolio; problems: string[] } | null>(null)
+  const [linkNote, setLinkNote] = useState<{ text: string; tone: 'info' | 'warn' } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [manualLink, setManualLink] = useState<string | null>(null)
+
+  const clearHash = () => window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  const applyShared = (v: SharedPortfolio) => {
+    onReplaceWatchlist(v.holdings.map(h => h.symbol))
+    const custom = v.holdings.every(h => h.weight !== undefined)
+    p.applyShared({
+      weights: custom ? Object.fromEntries(v.holdings.map(h => [h.symbol, h.weight as number])) : {},
+      window: v.window, confidence: v.confidence, size: v.size,
+    })
+    clearHash()
+    setPending(null)
+    setLinkNote({ text: `Loaded the shared portfolio of ${v.holdings.length} ${v.holdings.length === 1 ? 'stock' : 'stocks'}.`, tone: 'info' })
+  }
+  useEffect(() => {
+    if (!listReady) return
+    const read = () => {
+      const d = decodeShare(window.location.hash)
+      if (!d.isShare) return
+      if (!d.value) {
+        setLinkNote({ text: `This share link could not be used. ${d.problems.join(' ')}`, tone: 'warn' })
+        clearHash()
+        return
+      }
+      if (d.problems.length) setLinkNote({ text: d.problems.join(' '), tone: 'warn' })
+      if (watchedSymbols.length === 0) applyShared(d.value)
+      else setPending({ value: d.value, problems: d.problems })
+    }
+    read()
+    window.addEventListener('hashchange', read)
+    return () => window.removeEventListener('hashchange', read)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listReady])
+
+  const hasCustomWeights = watchedSymbols.some(sym => p.settings.weights[sym] !== undefined)
+  const buildLink = () => {
+    const hash = encodeShare({
+      holdings: watchedSymbols.map(symbol => ({ symbol, weight: hasCustomWeights ? p.rawWeights[symbol] : undefined })),
+      window: p.settings.window, confidence: p.settings.confidence, size: p.settings.size,
+    })
+    return `${window.location.origin}${window.location.pathname}#${hash}`
+  }
+  const copyLink = async () => {
+    const link = buildLink()
+    try {
+      await navigator.clipboard.writeText(link)
+      setManualLink(null)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      setManualLink(link) // clipboard blocked: show the link so it can be copied by hand
+    }
+  }
+  const downloadCsv = () => {
+    if (!m || !a || !p.meta) return
+    const csv = metricsCsv(m, {
+      windowLabel: WINDOW_LABEL[p.settings.window], confidence: p.settings.confidence, size: p.settings.size,
+      methodVersion: p.meta.methodology_version, pricesThrough: p.meta.last_date, scenarios: a.scenarios,
+    })
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const el = document.createElement('a')
+    el.href = url
+    el.download = `marketpulse-portfolio-risk-${p.meta.last_date}.csv`
+    el.click()
+    URL.revokeObjectURL(url)
+  }
 
   const rawSum = watchedSymbols.reduce((s, sym) => s + (p.rawWeights[sym] ?? 0), 0)
   const tail = m ? (p.settings.confidence === 0.99 ? m.tail99 : m.tail95) : null
@@ -187,18 +267,19 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
     const available = EXAMPLE.filter(s => byTicker[s])
     return (
       <div style={{ fontFamily: S.body, maxWidth: 560 }}>
+        {linkNote && <div style={{ marginBottom: 16 }}><Notice tone={linkNote.tone}>{linkNote.text}</Notice></div>}
         <div style={labelStyle}>Portfolio risk</div>
         <h1 style={{ fontSize: 'clamp(1.6rem,4vw,2.4rem)', fontWeight: 700, color: S.textPrimary, letterSpacing: '-0.03em', margin: '10px 0 12px' }}>Portfolio</h1>
         <p style={{ fontSize: 14, color: S.textMuted, lineHeight: 1.65, marginBottom: 24 }}>
           Add S&P 500 stocks to see how risky they are together, where the risk comes from, and how the mix behaved in past sell-offs. Everything is saved in this browser. No account needed.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          <button onClick={() => available.forEach(s => onToggleWatchlist(s))} style={primaryBtn}>
+          <button className="pf-tap" onClick={() => available.forEach(s => onToggleWatchlist(s))} style={primaryBtn}>
             Load an example of 8 large caps <ArrowRight size={14} />
           </button>
-          <button onClick={onNavigateToExplorer} style={ghostBtn}>Find stocks in Explorer</button>
+          <button className="pf-tap" onClick={onNavigateToExplorer} style={ghostBtn}>Find stocks in Explorer</button>
         </div>
-        <p style={{ fontSize: 12, color: S.textMuted, marginTop: 16 }}>The example adds {available.length} stocks to your watchlist. You can remove them any time.</p>
+        <p style={{ fontSize: 12, color: S.textMuted, marginTop: 16 }}>The example adds {available.length} stocks to your {LIST_NAME_LOWER}. You can remove them any time.</p>
       </div>
     )
   }
@@ -214,6 +295,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
 
   return (
     <div style={{ fontFamily: S.body, position: 'relative' }}>
+      <style>{`@media (max-width: 720px) { .pf-tap { min-height: 44px !important; min-width: 44px !important; } }`}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: '-12%', left: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,128,249,0.13) 0%, transparent 65%)', filter: 'blur(60px)' }} />
         <div style={{ position: 'absolute', bottom: '-12%', right: '-10%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(205,127,50,0.08) 0%, transparent 65%)', filter: 'blur(60px)' }} />
@@ -221,6 +303,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={labelStyle}>Portfolio risk</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', margin: '10px 0 8px' }}>
@@ -231,6 +314,27 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
             See how risky your stocks are together. All figures are historical and educational. They describe the past, they are not a forecast, and they are not advice.
           </p>
         </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="pf-tap" style={chipBtn} onClick={copyLink}><Link2 size={14} style={{ verticalAlign: -2, marginRight: 6 }} />{copied ? 'Link copied' : 'Copy link'}</button>
+          <button className="pf-tap" style={{ ...chipBtn, opacity: m ? 1 : 0.5 }} onClick={downloadCsv} disabled={!m}><Download size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Download CSV</button>
+        </div>
+        </div>
+
+        {pending && (
+          <div role="alertdialog" aria-label="Shared portfolio" style={{ ...glass({ padding: '16px 20px', borderRadius: 12 }), border: `1px solid ${S.primary}40` }}>
+            <div style={{ fontSize: 14, color: S.textPrimary, lineHeight: 1.6 }}>
+              This link contains a portfolio of {pending.value.holdings.length} {pending.value.holdings.length === 1 ? 'stock' : 'stocks'} ({pending.value.holdings.slice(0, 8).map(h => h.symbol).join(', ')}{pending.value.holdings.length > 8 ? ', and more' : ''}). Opening it replaces your current list of {watchedSymbols.length}.
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+              <button className="pf-tap" style={primaryBtn} onClick={() => applyShared(pending.value)}>Open shared portfolio</button>
+              <button className="pf-tap" style={ghostBtn} onClick={() => { setPending(null); clearHash() }}>Keep my own</button>
+            </div>
+          </div>
+        )}
+        {linkNote && <Notice tone={linkNote.tone}>{linkNote.text}</Notice>}
+        {manualLink && (
+          <Notice>Your browser blocked copying. Copy this link by hand: <input className="pf-tap" readOnly value={manualLink} aria-label="Share link" onFocus={e => e.currentTarget.select()} style={{ width: '100%', marginTop: 6, minHeight: 36, fontFamily: S.mono, fontSize: 12, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 8, padding: '0 8px' }} /></Notice>
+        )}
 
         {/* Controls */}
         <div style={glass({ padding: '14px 20px', display: 'flex', flexWrap: 'wrap', gap: '14px 28px', alignItems: 'center' })}>
@@ -240,7 +344,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
             options={[{ value: 0.95, text: '95%' }, { value: 0.99, text: '99%' }]} />
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={labelStyle}>Size</span>
-            <input aria-label="Portfolio size in dollars" inputMode="numeric" defaultValue={p.settings.size}
+            <input className="pf-tap" aria-label="Portfolio size in dollars" inputMode="numeric" defaultValue={p.settings.size}
               onChange={e => { const n = parseFloat(e.target.value.replace(/[^0-9.]/g, '')); if (n > 0) p.setSize(n) }}
               style={{ width: 110, minHeight: 36, fontFamily: S.mono, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 8, padding: '0 10px' }} />
           </label>
@@ -351,17 +455,56 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
             <span style={{ fontSize: 16, fontWeight: 600, color: S.textPrimary }}>Holdings</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={labelStyle}>What if</span>
-              <button style={chipBtn} onClick={p.setEqualWeights}>Equal weight</button>
-              <button style={chipBtn} onClick={p.setInverseVolWeights} disabled={!m} title="Weights proportional to 1 divided by each stock's volatility. An educational what-if, not a recommendation.">Inverse volatility</button>
+              <button className="pf-tap" style={chipBtn} onClick={p.setEqualWeights}>Equal weight</button>
+              <button className="pf-tap" style={chipBtn} onClick={p.setInverseVolWeights} disabled={!m} title="Weights proportional to 1 divided by each stock's volatility. An educational what-if, not a recommendation.">Inverse volatility</button>
             </div>
           </div>
 
+          {narrow ? (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {watchedSymbols.map(sym => {
+                const c = byTicker[sym]
+                const h = holdingOf[sym]
+                const ex = excludedOf[sym]
+                const stat = (label: string, value: string, color: string = S.textSecondary) => (
+                  <div><div style={labelStyle}>{label}</div><div style={{ fontFamily: S.mono, fontSize: 13, color }}>{value}</div></div>
+                )
+                return (
+                  <li key={sym} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${S.divider}`, borderRadius: 12, padding: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontFamily: S.mono, fontWeight: 700, color: S.textPrimary, fontSize: 15 }}>{sym}</div>
+                        <div style={{ fontSize: 12, color: S.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.company_name ?? 'Unknown company'}</div>
+                      </div>
+                      <WeightInput symbol={sym} value={p.rawWeights[sym] ?? 0} onCommit={v => p.setWeight(sym, v)} />
+                    </div>
+                    {(ex || (!a && p.noFile.includes(sym))) && <div style={{ fontSize: 11, color: S.warning, fontFamily: S.mono, marginTop: 6 }}>Left out of risk numbers</div>}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
+                      {stat('Risk share', h ? fmtPct(h.riskPercent) : 'n/a', S.textPrimary)}
+                      {stat('30D fcst', c ? `${c.forecast_30d_upside_pct >= 0 ? '+' : ''}${c.forecast_30d_upside_pct.toFixed(1)}%` : 'n/a', pctColor(c?.forecast_30d_upside_pct))}
+                      {stat('Vol', h ? fmtPct(h.annVol) : 'n/a')}
+                      {stat('Beta', h && Number.isFinite(h.beta) ? h.beta.toFixed(2) : 'n/a')}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 8 }}>
+                      {c && <button className="pf-tap" aria-label={`Open forecast for ${sym}`} onClick={() => onViewForecast(c)} style={iconBtn}><Share2 size={16} /></button>}
+                      {c && <button className="pf-tap" aria-label={`Ask AI about ${sym}`} onClick={() => onViewAI(c)} style={iconBtn}><Bot size={16} /></button>}
+                      <button className="pf-tap" aria-label={`Remove ${sym}`} onClick={() => onToggleWatchlist(sym)} style={iconBtn}><Trash2 size={16} /></button>
+                    </div>
+                  </li>
+                )
+              })}
+              <li style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 4px 0' }}>
+                <span style={labelStyle}>Total</span>
+                <span style={{ fontFamily: S.mono, fontSize: 13, color: Math.abs(rawSum - 100) > 0.05 ? S.warning : S.textPrimary }}>{round(rawSum)}%</span>
+              </li>
+            </ul>
+          ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 840 }}>
               <thead>
                 <tr>
-                  {['Stock', 'Sector', 'Weight', 'Risk share', '30D forecast', 'Volatility', 'Beta', ''].map((h, i) => (
-                    <th key={i} style={{ ...labelStyle, textAlign: i >= 2 && i <= 6 ? 'right' : 'left', padding: '12px 16px', fontWeight: 500, borderBottom: `1px solid ${S.divider}` }}>{h}</th>
+                  {['Stock', 'Sector', 'Weight', 'Risk share', '30D forecast', 'Volatility', 'Beta', 'Actions'].map((h, i) => (
+                    <th key={i} style={{ ...labelStyle, textAlign: i >= 2 && i <= 6 ? 'right' : 'left', padding: '12px 16px', fontWeight: 500, borderBottom: `1px solid ${S.divider}`, ...(h === 'Actions' ? { color: 'transparent' } : {}) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -388,9 +531,9 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
                       <td style={{ ...td, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: S.textSecondary }}>{h ? fmtPct(h.annVol) : 'n/a'}</td>
                       <td style={{ ...td, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: S.textSecondary }}>{h && Number.isFinite(h.beta) ? h.beta.toFixed(2) : 'n/a'}</td>
                       <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        {c && <button aria-label={`Open forecast for ${sym}`} title="Open forecast" onClick={() => onViewForecast(c)} style={iconBtn}><Share2 size={15} /></button>}
-                        {c && <button aria-label={`Ask AI about ${sym}`} title="Ask AI" onClick={() => onViewAI(c)} style={iconBtn}><Bot size={15} /></button>}
-                        <button aria-label={`Remove ${sym}`} title="Remove" onClick={() => onToggleWatchlist(sym)} style={iconBtn}><Trash2 size={15} /></button>
+                        {c && <button className="pf-tap" aria-label={`Open forecast for ${sym}`} title="Open forecast" onClick={() => onViewForecast(c)} style={iconBtn}><Share2 size={15} /></button>}
+                        {c && <button className="pf-tap" aria-label={`Ask AI about ${sym}`} title="Ask AI" onClick={() => onViewAI(c)} style={iconBtn}><Bot size={15} /></button>}
+                        <button className="pf-tap" aria-label={`Remove ${sym}`} title="Remove" onClick={() => onToggleWatchlist(sym)} style={iconBtn}><Trash2 size={15} /></button>
                       </td>
                     </tr>
                   )
@@ -403,21 +546,22 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
               </tbody>
             </table>
           </div>
+          )}
 
           {/* Add stock */}
           <div style={{ padding: '16px 24px', borderTop: `1px solid ${S.border}`, position: 'relative' }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <Plus size={16} color={S.textMuted} />
-              <input aria-label="Add a stock by ticker or name" placeholder={atLimit ? `Limit of ${MAX_HOLDINGS} stocks reached` : 'Add stock: ticker or name'} value={query} disabled={atLimit}
+              <input className="pf-tap" aria-label="Add a stock by ticker or name" placeholder={atLimit ? `Limit of ${MAX_HOLDINGS} stocks reached` : 'Add stock: ticker or name'} value={query} disabled={atLimit}
                 onChange={e => setQuery(e.target.value)}
                 style={{ flex: '1 1 240px', maxWidth: 360, minHeight: 40, fontFamily: S.body, fontSize: 14, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 10, padding: '0 12px' }} />
-              <button onClick={onNavigateToExplorer} style={ghostBtn}>Browse Explorer</button>
+              <button className="pf-tap" onClick={onNavigateToExplorer} style={ghostBtn}>Browse Explorer</button>
             </div>
             {matches.length > 0 && (
               <ul style={{ listStyle: 'none', margin: '8px 0 0 26px', padding: 0, maxWidth: 360, ...glass({ borderRadius: 12, overflow: 'hidden' }) }}>
                 {matches.map(c => (
                   <li key={c.symbol}>
-                    <button onClick={() => { onToggleWatchlist(c.symbol); setQuery('') }}
+                    <button className="pf-tap" onClick={() => { onToggleWatchlist(c.symbol); setQuery('') }}
                       style={{ width: '100%', minHeight: 44, textAlign: 'left', background: 'transparent', border: 'none', borderBottom: `1px solid ${S.divider}`, cursor: 'pointer', padding: '0 14px', color: S.textPrimary, fontSize: 13 }}>
                       <span style={{ fontFamily: S.mono, fontWeight: 700 }}>{c.symbol}</span> <span style={{ color: S.textMuted }}>{c.company_name}</span>
                     </button>
@@ -453,6 +597,9 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
         {a && a.scenarios.length > 0 && (
           <StressTests scenarios={a.scenarios} m={m} sectorOf={sectorOf} size={p.settings.size} windowLabel={WINDOW_LABEL[p.settings.window]} />
         )}
+
+        {/* Forecast next to risk */}
+        {m && <ForecastRisk m={m} byTicker={byTicker} />}
 
         {/* Method */}
         <details style={glass({ padding: '16px 24px' })}>

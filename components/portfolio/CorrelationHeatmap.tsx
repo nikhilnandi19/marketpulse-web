@@ -11,6 +11,8 @@ interface Props {
   onHover: (s: string | null) => void
 }
 
+const SR_ONLY: React.CSSProperties = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }
+
 /** Blue for negative, orange for positive, dark for zero. Safe for common color blindness, and every cell shows its number. */
 function cellColor(v: number): string {
   if (!Number.isFinite(v)) return 'rgba(255,255,255,0.04)'
@@ -49,12 +51,14 @@ export default function CorrelationHeatmap({ symbols, corr, sectorOf, hovered, o
       </div>
       <div style={{ overflowX: 'auto', paddingBottom: 6 }}>
         <div ref={grid} role="grid" aria-label="Correlation matrix of daily returns" style={{ display: 'inline-grid', gridTemplateColumns: `64px repeat(${n}, ${size}px)`, gap: 2 }}>
-          <div />
-          {order.map(ci => (
-            <div key={`h${ci}`} role="columnheader" style={{ ...labelStyle, fontSize: 9, textAlign: 'center', paddingBottom: 4, color: hovered === symbols[ci] ? S.primary : S.textMuted, fontWeight: hovered === symbols[ci] ? 700 : 400 }}>
-              {symbols[ci]}
-            </div>
-          ))}
+          <div role="row" style={{ display: 'contents' }}>
+            <div role="columnheader"><span style={SR_ONLY}>Stock</span></div>
+            {order.map(ci => (
+              <div key={`h${ci}`} role="columnheader" style={{ ...labelStyle, fontSize: 9, textAlign: 'center', paddingBottom: 4, color: hovered === symbols[ci] ? S.primary : S.textMuted, fontWeight: hovered === symbols[ci] ? 700 : 400 }}>
+                {symbols[ci]}
+              </div>
+            ))}
+          </div>
           {order.map((ri, r) => (
             <div key={`r${ri}`} role="row" style={{ display: 'contents' }}>
               <div role="rowheader" style={{ ...labelStyle, fontSize: 10, display: 'flex', alignItems: 'center', color: hovered === symbols[ri] ? S.primary : S.textSecondary, fontWeight: hovered === symbols[ri] ? 700 : 400 }}>{symbols[ri]}</div>

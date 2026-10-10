@@ -35,7 +35,7 @@ export default function RiskContribution({ holdings, mode, onMode, tailCount, co
         </div>
         <div role="group" aria-label="Risk measure" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 9999, padding: 3 }}>
           {([['vol', 'Volatility'], ['tail', 'Bad days']] as const).map(([v, t]) => (
-            <button key={v} aria-pressed={mode === v} onClick={() => onMode(v)}
+            <button className="pf-tap" key={v} aria-pressed={mode === v} onClick={() => onMode(v)}
               style={{ minHeight: 32, padding: '0 14px', borderRadius: 9999, border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: mode === v ? `${S.primary}26` : 'transparent', color: mode === v ? S.primary : S.textMuted }}>
               {t}
             </button>

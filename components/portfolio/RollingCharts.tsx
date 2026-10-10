@@ -66,7 +66,7 @@ export function RollingVolChart({ m }: { m: Metrics }) {
         <div style={{ fontSize: 16, fontWeight: 600, color: S.textPrimary }}>Rolling volatility</div>
         <div role="group" aria-label="Rolling window" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 9999, padding: 3 }}>
           {([21, 63] as const).map(w => (
-            <button key={w} aria-pressed={win === w} onClick={() => setWin(w)}
+            <button className="pf-tap" key={w} aria-pressed={win === w} onClick={() => setWin(w)}
               style={{ minHeight: 32, minWidth: 52, borderRadius: 9999, border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: win === w ? `${S.primary}26` : 'transparent', color: win === w ? S.primary : S.textMuted }}>
               {w}-day
             </button>
