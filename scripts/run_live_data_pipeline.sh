@@ -110,4 +110,7 @@ print("  Risk summary rows:", len(by_risk))
 print("  Outcome status distribution:", snapshots["outcome_status"].value_counts().to_dict())
 PY
 
+echo "Step 8: Export adjusted price history for the Portfolio risk page"
+python scripts/06_export_price_history.py
+
 echo "MarketPulse live data pipeline completed."
