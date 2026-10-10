@@ -30,7 +30,8 @@ export function computeFlags(m: FlagInput): RiskFlag[] {
     }
   }
 
-  const topSector = m.sectors[0]
+  // A missing sector says nothing about concentration, so "Unknown" is never flagged.
+  const topSector = m.sectors.find(x => x.sector !== 'Unknown')
   if (topSector && m.holdings.length > 1 && topSector.weight > FLAGS.singleSector) {
     out.push({
       id: `sector-${topSector.sector}`,

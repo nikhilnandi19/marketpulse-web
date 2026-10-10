@@ -1,5 +1,5 @@
 /// Runs the risk math off the main thread so editing a weight never blocks the page.
-import { analyzeHoldings, buildDataset, growthPaths, type Dataset, type PriceFile } from '@/lib/risk'
+import { analyzeHoldings, buildDataset, growthPaths, runScenarios, type Dataset, type PriceFile } from '@/lib/risk'
 import type { AnalysisPayload, FromWorker, ToWorker } from './riskMessages'
 
 const ctx = self as unknown as {
@@ -37,6 +37,7 @@ ctx.onmessage = (e: MessageEvent<ToWorker>) => {
         windowDays: res.panel?.windowDays ?? 0,
         metrics: m,
         growth: m && res.panel ? growthPaths(res.panel, m.holdings.map(h => h.weight)) : null,
+        scenarios: runScenarios(dataset, msg.holdings),
         computeMs: performance.now() - t0,
       }
       ctx.postMessage({ type: 'result', id: msg.id, payload })

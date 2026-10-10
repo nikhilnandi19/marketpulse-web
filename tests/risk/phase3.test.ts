@@ -77,6 +77,11 @@ describe('flags', () => {
     expect(ids).toContain('avg-correlation')
     expect(ids).toContain('vol-vs-bench')
   })
+  it('never flags a sector concentration for stocks with no sector', () => {
+    const f = computeFlags({ ...calm, sectors: [{ sector: 'Unknown', weight: 0.9 }, { sector: 'Tech', weight: 0.1 }] })
+    expect(f.map(x => x.id)).not.toContain('sector-Unknown')
+    expect(f.map(x => x.id).some(id => id.startsWith('sector-'))).toBe(false)
+  })
   it('does not flag risk share when the holding is small in absolute terms', () => {
     const f = computeFlags({ ...calm, holdings: [holding('A', 0.05, 0.15), holding('B', 0.95, 0.85)] })
     expect(f.map(x => x.id)).not.toContain('risk-share-A') // 15% is not above 20%

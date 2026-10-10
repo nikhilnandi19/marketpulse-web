@@ -1,4 +1,4 @@
-import type { AnalysisOptions, GrowthPaths, Holding, HoldingIssue, Metrics, PriceFile, ReturnPanel } from '@/lib/risk'
+import type { AnalysisOptions, GrowthPaths, Holding, HoldingIssue, Metrics, PriceFile, ReturnPanel, ScenarioResult } from '@/lib/risk'
 
 export type ToWorker =
   | { type: 'base'; dates: string[]; benchmark: PriceFile }
@@ -14,6 +14,7 @@ export interface AnalysisPayload {
   windowDays: number
   metrics: Metrics | null
   growth: GrowthPaths | null
+  scenarios: ScenarioResult[]
   computeMs: number
 }
 

@@ -1,7 +1,8 @@
 import { PARTIAL_COVERAGE } from './config'
 import { drawdownFromWealth } from './drawdown'
-import type { Scenario } from './scenarios'
-import type { Dataset } from './types'
+import { normalizeHoldings } from './portfolio'
+import { SCENARIOS, type Scenario } from './scenarios'
+import type { Dataset, Holding } from './types'
 
 export interface ScenarioHolding {
   symbol: string
@@ -157,4 +158,15 @@ export function sectorShock(symbols: string[], weights: number[], sectorOf: Reco
  */
 export function reverseStress(targetLoss: number, portfolioBeta: number): number | null {
   return portfolioBeta > 0 ? targetLoss / portfolioBeta : null
+}
+
+/**
+ * Replay every configured scenario for the entered holdings. Uses the entered weights
+ * (scaled to 100%) including holdings that have no price history, so `coverage` reflects
+ * how much of what was entered actually had data. Empty if the holdings are invalid.
+ */
+export function runScenarios(ds: Dataset, holdings: Holding[]): ScenarioResult[] {
+  const norm = normalizeHoldings(holdings)
+  if (norm.issues.length > 0) return []
+  return SCENARIOS.map(s => scenarioReplay(ds, norm.symbols, norm.weights, s))
 }

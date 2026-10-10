@@ -3,7 +3,7 @@ import {
   analyzeHoldings, avgPairwiseCorrelation, buildReturnPanel, computeMetrics, corr, corrMatrix, annualCovariance,
   diversificationRatio, drawdownFromReturns, effectiveHoldings, expectedShortfall, historicalVaR, inverseVolWeights,
   marketShock, normalizeHoldings, portfolioReturns, quantile, reverseStress, riskContributions, scenarioReplay,
-  sectorShock, simpleReturns, std, tailContributions, worstRolling, SCENARIOS, type Scenario,
+  runScenarios, sectorShock, simpleReturns, std, tailContributions, worstRolling, SCENARIOS, type Scenario,
 } from '@/lib/risk'
 import { datasetFrom, panelFrom } from './helpers'
 
@@ -224,6 +224,24 @@ describe('stress', () => {
   })
   it('has the five configured scenarios', () => {
     expect(SCENARIOS.map(s => s.id)).toEqual(['q4_2018', 'covid_2020', 'bear_2022', 'tariff_2025', 'worst_day'])
+  })
+})
+
+describe('runScenarios', () => {
+  const dates = Array.from({ length: 10 }, (_, i) => `2020-01-${String(i + 1).padStart(2, '0')}`)
+  const ds = { dates, benchmark: [100, 101, 102, 99, 95, 90, 92, 94, 96, 98], series: { A: [10, 10.5, 11, 10, 9, 8, 8.5, 9, 9.5, 10] as (number | null)[] } }
+  it('counts a holding with no price history against coverage instead of ignoring it', () => {
+    const sc = { id: 'x', name: 'x', start: '2020-01-03', end: '2020-01-06', kind: 'drawdown' as const, blurb: '' }
+    const r = scenarioReplay(ds, ['A', 'GHOST'], [0.5, 0.5], sc)
+    expect(r.coverage).toBeCloseTo(0.5, 12)
+    expect(r.status).toBe('partial')
+    expect(r.excluded).toEqual(['GHOST'])
+  })
+  it('returns every configured scenario, hiding ones the data does not reach', () => {
+    const out = runScenarios(ds, [{ symbol: 'A', weight: 1 }])
+    expect(out.map(s => s.id)).toEqual(SCENARIOS.map(s => s.id))
+    expect(out.every(s => s.status === 'unavailable')).toBe(true) // data starts in 2020-01
+    expect(runScenarios(ds, [])).toEqual([])
   })
 })
 

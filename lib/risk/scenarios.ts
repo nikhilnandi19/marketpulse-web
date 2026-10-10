@@ -17,7 +17,7 @@ export interface Scenario {
 
 export const SCENARIOS: Scenario[] = [
   { id: 'q4_2018', name: 'Q4 2018 selloff', start: '2018-09-20', end: '2018-12-24', kind: 'drawdown', blurb: 'Rate-hike fears and trade war worries.' },
-  { id: 'covid_2020', name: 'COVID crash', start: '2020-02-19', end: '2020-03-23', kind: 'drawdown', blurb: 'The fastest 30% fall on record.' },
+  { id: 'covid_2020', name: 'COVID crash', start: '2020-02-19', end: '2020-03-23', kind: 'drawdown', blurb: 'A sharp global sell-off as COVID-19 spread.' },
   { id: 'bear_2022', name: '2022 rate bear market', start: '2022-01-03', end: '2022-10-12', kind: 'drawdown', blurb: 'Inflation and sharply higher interest rates.' },
   { id: 'tariff_2025', name: '2025 tariff selloff', start: '2025-02-19', end: '2025-04-08', kind: 'drawdown', blurb: 'New US tariffs and trade policy shock.' },
   // The worst day is 2020-03-16. The previous close is the starting point so the replay is that day's move.
