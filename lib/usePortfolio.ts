@@ -75,6 +75,8 @@ export interface PortfolioHook {
   setSize: (n: number) => void
   setEqualWeights: () => void
   setInverseVolWeights: () => void
+  /** Apply weights and settings from a share link. Tickers are replaced separately via the watchlist. */
+  applyShared: (s: { weights: Record<string, number>; window: WindowKey; confidence: Confidence; size: number }) => void
   analysis: AnalysisPayload | null
   /** True while a new result is being computed. */
   computing: boolean
@@ -101,17 +103,22 @@ export function usePortfolio(symbols: string[], sectorOf: Record<string, string>
   const requestId = useRef(0)
   const latestApplied = useRef(0)
 
+  // Latest settings, kept in a ref so updates can be written to storage right away.
+  // (Writing inside a state updater runs later and can lose to the mount-time read.)
+  const settingsRef = useRef<Stored>(DEFAULTS)
+
   useEffect(() => {
-    setSettings(readStored())
+    const stored = readStored()
+    settingsRef.current = stored
+    setSettings(stored)
     setLoaded(true)
   }, [])
 
   const update = useCallback((patch: Partial<Stored>) => {
-    setSettings(prev => {
-      const next = { ...prev, ...patch }
-      writeStored(next)
-      return next
-    })
+    const next = { ...settingsRef.current, ...patch }
+    settingsRef.current = next
+    writeStored(next)
+    setSettings(next)
   }, [])
 
   // Start the worker and load the calendar + benchmark once.
@@ -237,6 +244,7 @@ export function usePortfolio(symbols: string[], sectorOf: Record<string, string>
     setSize: n => update({ size: n > 0 ? n : DEFAULTS.size }),
     setEqualWeights,
     setInverseVolWeights,
+    applyShared: s => update({ weights: s.weights, window: s.window, confidence: s.confidence, size: s.size }),
     analysis,
     computing,
     dataStatus,
