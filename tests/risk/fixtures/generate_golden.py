@@ -87,6 +87,22 @@ def worst(r: np.ndarray, k: int) -> dict:
     return {"value": float(roll.min()), "start_idx": end - k + 1, "end_idx": end}
 
 
+def nan_to_none(a) -> list:
+    return [None if np.isnan(v) else float(v) for v in a]
+
+
+def rolling_avg_corr(R: np.ndarray, w: np.ndarray, win: int) -> list:
+    """Average pairwise correlation per window, using np.corrcoef on each window directly."""
+    n, T = R.shape
+    off = ~np.eye(n, dtype=bool)
+    ww = np.outer(w, w)
+    out = [np.nan] * T
+    for t in range(win - 1, T):
+        c = np.corrcoef(R[:, t - win + 1 : t + 1])
+        out[t] = (ww[off] * c[off]).sum() / ww[off].sum()
+    return out
+
+
 def case(df: pd.DataFrame, bench: pd.Series, cal: list[str], window: int, w: np.ndarray, name: str) -> dict:
     prices = df.copy()
     prices["_bench"] = bench
@@ -155,6 +171,11 @@ def case(df: pd.DataFrame, bench: pd.Series, cal: list[str], window: int, w: np.
         "tail_es": float(-rp[tail_set].mean()),
         "tail_contrib": tail_contrib.tolist(),
         "port_returns": rp.tolist(),
+        "roll_vol21": nan_to_none(pd.Series(rp).rolling(21).std(ddof=1).to_numpy() * np.sqrt(ANN)),
+        "roll_vol63": nan_to_none(pd.Series(rp).rolling(63).std(ddof=1).to_numpy() * np.sqrt(ANN)),
+        "bench_roll_vol21": nan_to_none(pd.Series(m).rolling(21).std(ddof=1).to_numpy() * np.sqrt(ANN)),
+        "bench_roll_vol63": nan_to_none(pd.Series(m).rolling(63).std(ddof=1).to_numpy() * np.sqrt(ANN)),
+        "roll_avg_corr60": nan_to_none(np.array(rolling_avg_corr(R, w, 60))),
     }
 
 

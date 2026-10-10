@@ -2,6 +2,7 @@ import { MIN_OBSERVATIONS, TRADING_DAYS, WINDOWS, type WindowKey } from './confi
 import { annualCovariance, riskContributions, tailContributions, type RiskContribution, type TailContribution } from './contribution'
 import { avgPairwiseCorrelation, diversificationRatio, effectiveHoldings, hhi, mostCorrelatedPair, sectorWeights, topWeight } from './concentration'
 import { drawdownFromReturns, worstRolling } from './drawdown'
+import { rollingAvgCorrelation, rollingVol } from './rolling'
 import { normalizeHoldings, portfolioReturns, renormalize } from './portfolio'
 import { buildReturnPanel } from './returns'
 import { beta, corr, corrMatrix, std } from './stats'
@@ -53,6 +54,8 @@ export interface Metrics {
   riskContribution: RiskContribution
   tailContribution: TailContribution
   holdings: HoldingMetrics[]
+  /** Rolling series aligned to `dates`; NaN until a full window exists. */
+  rolling: { vol21: number[]; vol63: number[]; benchVol21: number[]; benchVol63: number[]; avgCorr60: number[] }
   /** Daily portfolio and benchmark returns for charts. */
   portfolioReturns: number[]
   benchReturns: number[]
@@ -141,6 +144,13 @@ export function computeMetrics(panel: ReturnPanel, w: number[], weightCoverage: 
       riskPercent: rc.percent[i],
       tailPercent: tc.es > 0 ? tc.contribution[i] / tc.es : NaN,
     })),
+    rolling: {
+      vol21: rollingVol(rp, 21),
+      vol63: rollingVol(rp, 63),
+      benchVol21: rollingVol(panel.bench, 21),
+      benchVol63: rollingVol(panel.bench, 63),
+      avgCorr60: rollingAvgCorrelation(panel.returns, w, 60),
+    },
     portfolioReturns: rp,
     benchReturns: panel.bench,
     dates: panel.dates,

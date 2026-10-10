@@ -77,6 +77,21 @@ describe.each(golden.cases)('golden: $name', c => {
     expect(maxAbsDiff(m.holdings.map(h => h.beta), c.asset_beta)).toBeLessThan(TOL)
   })
 
+  it('matches pandas for rolling volatility and rolling average correlation', () => {
+    const cmp = (mine: number[], ref: (number | null)[]) => {
+      expect(mine.length).toBe(ref.length)
+      mine.forEach((v, i) => {
+        if (ref[i] === null) expect(v).toBeNaN()
+        else expect(Math.abs(v - (ref[i] as number))).toBeLessThan(TOL)
+      })
+    }
+    cmp(m.rolling.vol21, c.roll_vol21)
+    cmp(m.rolling.vol63, c.roll_vol63)
+    cmp(m.rolling.benchVol21, c.bench_roll_vol21)
+    cmp(m.rolling.benchVol63, c.bench_roll_vol63)
+    cmp(m.rolling.avgCorr60, c.roll_avg_corr60)
+  })
+
   it('matches for risk contribution and tail contribution', () => {
     expect(Math.abs(m.riskContribution.vol - c.port_vol)).toBeLessThan(TOL)
     expect(Math.abs(m.annVol - c.port_vol)).toBeLessThan(TOL)
