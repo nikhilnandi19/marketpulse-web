@@ -15,7 +15,7 @@ function Stat({ label, value, explain }: { label: string; value: string; explain
   )
 }
 
-export default function Diversification({ m }: { m: Metrics }) {
+export default function Diversification({ m, unknownSymbols }: { m: Metrics; unknownSymbols: string[] }) {
   const num = (x: number, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : 'n/a')
   return (
     <div style={glass({ padding: '22px 24px' })}>
@@ -30,7 +30,7 @@ export default function Diversification({ m }: { m: Metrics }) {
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {m.sectors.map((s, i) => (
           <li key={s.sector} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 12, color: S.textSecondary, width: 150, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector}</span>
+            <span style={{ fontSize: 12, color: S.textSecondary, width: 150, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sector === 'Unknown' ? 'Sector not in data' : s.sector}</span>
             <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 9999 }}>
               <div style={{ width: `${s.weight * 100}%`, height: '100%', borderRadius: 9999, background: SECTOR_COLORS[i] ?? S.outline }} />
             </div>
@@ -38,6 +38,11 @@ export default function Diversification({ m }: { m: Metrics }) {
           </li>
         ))}
       </ul>
+      {unknownSymbols.length > 0 && (
+        <p style={{ fontSize: 12, color: S.textMuted, lineHeight: 1.5, margin: '12px 0 0' }}>
+          The dataset has no sector for {unknownSymbols.join(', ')}, so {unknownSymbols.length === 1 ? 'it is' : 'they are'} grouped separately and left out of the sector flag and sector shock.
+        </p>
+      )}
     </div>
   )
 }

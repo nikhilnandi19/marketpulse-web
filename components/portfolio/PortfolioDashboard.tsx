@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Plus, Trash2, Share2, Bot } from 'lucide-react'
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { CompanySummary } from '@/lib/types'
-import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, WINDOWS, computeFlags, type WindowKey } from '@/lib/risk'
+import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, SCENARIOS, WINDOWS, computeFlags, type WindowKey } from '@/lib/risk'
 import { usePortfolio, type Confidence } from '@/lib/usePortfolio'
 import { S, glass, fmtPct, fmtDate, fmtMoney, pctColor, labelStyle } from './tokens'
 import RiskContribution, { type ContributionMode } from './RiskContribution'
 import CorrelationHeatmap from './CorrelationHeatmap'
 import Diversification from './Diversification'
 import Flags from './Flags'
+import StressTests from './StressTests'
 import { RollingCorrelationChart, RollingVolChart } from './RollingCharts'
 
 interface Props {
@@ -162,6 +163,15 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
 
   const flags = useMemo(() => (m ? computeFlags(m) : []), [m])
 
+  // Past sell-offs that fall inside the chart's date range, shaded on both charts.
+  const stressShades = useMemo(() => {
+    const dates = a?.growth?.dates ?? []
+    return SCENARIOS.filter(sc => sc.kind === 'drawdown').flatMap(sc => {
+      const inside = dates.filter(d => d >= sc.start && d <= sc.end)
+      return inside.length > 1 ? [{ id: sc.id, name: sc.name, x1: inside[0], x2: inside[inside.length - 1], start: sc.start, end: sc.end }] : []
+    })
+  }, [a])
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return []
@@ -300,6 +310,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData} syncId="pf" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                  {stressShades.map(z => <ReferenceArea key={z.id} x1={z.x1} x2={z.x2} fill={S.bronze} fillOpacity={0.14} stroke="none" />)}
                   <XAxis dataKey="d" tickFormatter={shortDate} minTickGap={60} tick={axisTick} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTick} axisLine={false} tickLine={false} width={44} domain={['auto', 'auto']} tickFormatter={(v: number) => v.toFixed(0)} />
                   <Tooltip content={<ChartTip kind="growth" />} />
@@ -310,6 +321,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
               <ResponsiveContainer width="100%" height={130}>
                 <AreaChart data={chartData} syncId="pf" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                  {stressShades.map(z => <ReferenceArea key={z.id} x1={z.x1} x2={z.x2} fill={S.bronze} fillOpacity={0.14} stroke="none" />)}
                   <XAxis dataKey="d" hide />
                   <YAxis tick={axisTick} axisLine={false} tickLine={false} width={44} domain={['auto', 0]} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
                   <Tooltip content={<ChartTip kind="dd" />} />
@@ -318,6 +330,11 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            {stressShades.length > 0 && (
+              <div style={{ fontSize: 12, color: S.textMuted, marginTop: 4 }}>
+                <span style={{ color: S.bronze }}>■</span> Shaded: {stressShades.map(z => `${z.name} (${fmtDate(z.start)} to ${fmtDate(z.end)})`).join('; ')}. Details in the stress tests below.
+              </div>
+            )}
             <div style={{ fontSize: 12, color: S.textMuted, marginTop: 6 }}>
               {mode === 'rebalanced'
                 ? 'Rebalanced daily means the weights are reset to your targets every day. The lower chart shows how far below its previous high the portfolio was.'
@@ -424,12 +441,17 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
         {m && a?.growth && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 16, opacity: p.computing ? 0.6 : 1, transition: 'opacity .2s' }}>
-              <Diversification m={m} />
+              <Diversification m={m} unknownSymbols={m.symbols.filter(x => (sectorOf[x] || 'Unknown') === 'Unknown')} />
               <RollingCorrelationChart m={m} growth={a.growth} />
             </div>
             <CorrelationHeatmap symbols={m.symbols} corr={m.corr} sectorOf={sectorOf} hovered={hovered} onHover={setHovered} />
             <RollingVolChart m={m} />
           </>
+        )}
+
+        {/* Stress tests */}
+        {a && a.scenarios.length > 0 && (
+          <StressTests scenarios={a.scenarios} m={m} sectorOf={sectorOf} size={p.settings.size} windowLabel={WINDOW_LABEL[p.settings.window]} />
         )}
 
         {/* Method */}
@@ -445,7 +467,9 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
             <li>Risk share is weight times marginal volatility divided by portfolio volatility, so the shares add up to 100%. Bad-day share is each stock's average loss on the portfolio's worst days, as a share of expected shortfall.</li>
             <li>Correlation is the Pearson correlation of daily returns over the window. Average correlation is weighted by position sizes.</li>
             <li>A stock with returns on less than 90% of the window is left out and named above, so one recent listing cannot shrink everyone's window.</li>
-            <li>Today's S&P 500 members only. Stocks that left the index are not included.</li>
+            <li>Stress-test replays use your weights at the start of each window, buy and hold, no rebalancing. Stocks with no price on the start or end date are left out and the rest are scaled to 100%; below 80% coverage a scenario is marked partial.</li>
+            <li>The market-fall estimate is portfolio beta times the market move. It is a rough approximation that assumes betas hold, which they often do not in real crises.</li>
+            <li>Today's S&P 500 members only. Stocks that left the index are not included, so past sell-offs look milder than they were.</li>
           </ul>
         </details>
       </div>
