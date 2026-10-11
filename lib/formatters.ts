@@ -1,25 +1,25 @@
 export function formatCurrency(value: number | null | undefined, decimals = 2): string {
-  if (value == null || isNaN(value)) return '—'
+  if (value == null || isNaN(value)) return 'n/a'
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
 }
 
 export function formatPercent(value: number | null | undefined, decimals = 2): string {
-  if (value == null || isNaN(value)) return '—'
+  if (value == null || isNaN(value)) return 'n/a'
   return `${value >= 0 ? '+' : ''}${value.toFixed(decimals)}%`
 }
 
 export function formatPercentPlain(value: number | null | undefined, decimals = 2): string {
-  if (value == null || isNaN(value)) return '—'
+  if (value == null || isNaN(value)) return 'n/a'
   return `${value.toFixed(decimals)}%`
 }
 
 export function formatNumber(value: number | null | undefined, decimals = 2): string {
-  if (value == null || isNaN(value)) return '—'
+  if (value == null || isNaN(value)) return 'n/a'
   return value.toFixed(decimals)
 }
 
 export function formatCompactNumber(value: number | null | undefined): string {
-  if (value == null || isNaN(value)) return '—'
+  if (value == null || isNaN(value)) return 'n/a'
   if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(1)}B`
   if (Math.abs(value) >= 1e6) return `$${(value / 1e6).toFixed(1)}M`
   if (Math.abs(value) >= 1e3) return `$${(value / 1e3).toFixed(1)}K`
@@ -27,7 +27,7 @@ export function formatCompactNumber(value: number | null | undefined): string {
 }
 
 export function formatDate(value: string | null | undefined): string {
-  if (!value) return '—'
+  if (!value) return 'n/a'
   try { return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
   catch { return value }
 }

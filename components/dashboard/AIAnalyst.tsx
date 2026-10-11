@@ -1,5 +1,6 @@
 'use client'
 
+import { LIST_NAME } from '@/lib/riskLab'
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -63,7 +64,7 @@ const ANALYSIS_MODES: ReadonlyArray<{ id: string; label: string; Icon: LucideIco
   { id: 'risk',        label: 'Risk',         Icon: Shield     },
   { id: 'reliability', label: 'Reliability',  Icon: BarChart2  },
   { id: 'sector',      label: 'Sector',       Icon: Globe      },
-  { id: 'watchlist',   label: 'Watchlist',    Icon: Bookmark   },
+  { id: 'watchlist',   label: LIST_NAME,    Icon: Bookmark   },
   { id: 'memo',        label: 'Stock Memo',   Icon: FileText   },
 ]
 
@@ -382,12 +383,12 @@ export default function AIAnalyst({
     { label: 'MAPE',       value: `${company.best_model_mape.toFixed(1)}%` },
     { label: '30D Upside', value: (company.forecast_30d_upside_pct >= 0 ? '+' : '') + company.forecast_30d_upside_pct.toFixed(1) + '%' },
     { label: 'Risk Level', value: company.risk_level === 'High Risk' ? 'HIGH' : company.risk_level === 'Moderate Risk' ? 'MED' : 'LOW' },
-    { label: 'EPS',        value: company.eps != null ? `$${company.eps.toFixed(2)}` : '—' },
-    { label: 'Margin',     value: company.profit_margin_pct != null ? `${company.profit_margin_pct.toFixed(1)}%` : '—' },
+    { label: 'EPS',        value: company.eps != null ? `$${company.eps.toFixed(2)}` : 'n/a' },
+    { label: 'Margin',     value: company.profit_margin_pct != null ? `${company.profit_margin_pct.toFixed(1)}%` : 'n/a' },
   ] : [
-    { label: 'Volatility', value: '—' }, { label: 'MAPE', value: '—' },
-    { label: '30D Upside', value: '—' }, { label: 'Risk Level', value: '—' },
-    { label: 'EPS',        value: '—' }, { label: 'Margin', value: '—' },
+    { label: 'Volatility', value: 'n/a' }, { label: 'MAPE', value: 'n/a' },
+    { label: '30D Upside', value: 'n/a' }, { label: 'Risk Level', value: 'n/a' },
+    { label: 'EPS',        value: 'n/a' }, { label: 'Margin', value: 'n/a' },
   ]
 
   const sigColor = company ? (SIG_COLORS[company.final_signal] ?? SIG_DEFAULT) : SIG_DEFAULT
@@ -677,11 +678,11 @@ export default function AIAnalyst({
                     <span style={{ color: D.textSec }}>Explorer</span>,{' '}
                     <span style={{ color: D.textSec }}>Forecast</span>,{' '}
                     <span style={{ color: D.textSec }}>Risk Matrix</span>, or{' '}
-                    <span style={{ color: D.textSec }}>Watchlist</span>{' '}
+                    <span style={{ color: D.textSec }}>{LIST_NAME}</span>{' '}
                     to generate a MarketPulse AI explanation.
                   </p>
                   <p style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, lineHeight: 1.6, maxWidth: 440 }}>
-                    MarketPulse AI generates explanations from loaded dashboard data: signal, forecast, risk, reliability, sector context, watchlist status, and a full stock memo. No external data is fetched.
+                    MarketPulse AI generates explanations from loaded dashboard data: signal, forecast, risk, reliability, sector context, list status, and a full stock memo. No external data is fetched.
                   </p>
                 </div>
               ) : (
@@ -711,14 +712,14 @@ export default function AIAnalyst({
                       {onToggleWatchlist ? (
                         <button
                           onClick={() => onToggleWatchlist(company.symbol)}
-                          title={isWatched ? `Remove ${company.symbol} from Watchlist` : `Add ${company.symbol} to Watchlist`}
+                          title={isWatched ? `Remove ${company.symbol} from ${LIST_NAME}` : `Add ${company.symbol} to ${LIST_NAME}`}
                           style={{ background: 'none', border: `1px solid ${D.border}`, borderRadius: 4, cursor: 'pointer', padding: '7px 10px', flexShrink: 0, color: isWatched ? D.orange : D.textMuted, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: D.mono }}>
                           <Bookmark size={12} fill={isWatched ? D.orange : 'none'} />
-                          {isWatched ? 'In Watchlist' : '+ Watchlist'}
+                          {isWatched ? `In ${LIST_NAME}` : `+ ${LIST_NAME}`}
                         </button>
                       ) : isWatched ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: D.orange, fontSize: 10, fontFamily: D.mono, flexShrink: 0 }}>
-                          <Bookmark size={11} fill={D.orange} /> Watchlist
+                          <Bookmark size={11} fill={D.orange} /> {LIST_NAME}
                         </div>
                       ) : null}
                     </div>

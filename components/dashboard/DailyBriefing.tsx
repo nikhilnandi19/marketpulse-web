@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { TrendingUp, AlertTriangle, Bookmark, BookmarkPlus } from 'lucide-react'
 import type { CompanySummary, SectorSummary, SignalSnapshot, SignalPerformanceSummary } from '@/lib/types'
 import { formatPercent } from '@/lib/formatters'
+import { LIST_NAME } from '@/lib/riskLab'
 
 interface Props {
   companies?: CompanySummary[]
@@ -238,7 +239,7 @@ export default function DailyBriefing({
                     <div style={{ fontSize: 16, fontWeight: 700, color: S.negative, fontFamily: 'JetBrains Mono, monospace' }}>
                       {Number.isFinite(briefing.highestVol.annualized_volatility_pct)
                         ? `${briefing.highestVol.annualized_volatility_pct.toFixed(1)}%`
-                        : '—'}
+                        : 'n/a'}
                     </div>
                     <div style={{ fontSize: 10, color: S.textMuted }}>Risk Index</div>
                   </div>
@@ -281,11 +282,11 @@ export default function DailyBriefing({
             </div>
           </div>
 
-          {/* Panel 4 — Watchlist */}
+          {/* Panel 4: saved list */}
           <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
             {briefing.watchlistNote ? (
               <>
-                {panelLabel('Watchlist', S.outline)}
+                {panelLabel(LIST_NAME, S.outline)}
                 <Bookmark size={28} style={{ color: S.primary, marginBottom: 12 }} />
                 <div style={{ fontSize: 28, fontWeight: 700, color: S.primary, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 6 }}>
                   {briefing.watchlistNote.count}
@@ -305,13 +306,13 @@ export default function DailyBriefing({
                   style={{ border: `1px solid ${S.primary}`, background: 'none', color: S.primary, padding: '8px 20px', borderRadius: 9999, fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', fontFamily: 'Inter, sans-serif', transition: 'background 0.15s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${S.primary}18` }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
-                  View Watchlist →
+                  View {LIST_NAME} →
                 </button>
               </>
             ) : (
               <>
                 <BookmarkPlus size={36} style={{ color: S.primary, marginBottom: 14, opacity: 0.8 }} />
-                <h3 style={{ fontSize: 17, fontWeight: 600, color: S.textPrimary, letterSpacing: '-0.01em', marginBottom: 8 }}>Build Watchlist</h3>
+                <h3 style={{ fontSize: 17, fontWeight: 600, color: S.textPrimary, letterSpacing: '-0.01em', marginBottom: 8 }}>Build {LIST_NAME === 'Portfolio' ? 'a Portfolio' : 'Watchlist'}</h3>
                 <p style={{ fontSize: 13, color: S.textMuted, lineHeight: 1.5, maxWidth: 200, marginBottom: 20 }}>
                   Monitor specific tickers with personalised briefing summaries.
                 </p>

@@ -1,5 +1,6 @@
 'use client'
 
+import { LIST_NAME_LOWER } from '@/lib/riskLab'
 import { useState, useMemo, useCallback } from 'react'
 import { Search, GitBranch, Bot, RotateCcw, Bookmark } from 'lucide-react'
 import type { CompanySummary } from '@/lib/types'
@@ -278,7 +279,7 @@ export default function CompanyExplorer({
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <input type="number" placeholder="5.0" value={upsideMinInput} onChange={e => setUpsideMinInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
               style={{ background: D.bg, border: `1px solid ${D.border}`, color: D.text, width: 50, padding: '3px 6px', fontSize: 11, fontFamily: D.mono, textAlign: 'center', borderRadius: 2, outline: 'none' }} />
-            <span style={{ color: D.textMuted, fontSize: 11 }}>—</span>
+            <span style={{ color: D.textMuted, fontSize: 11 }}>n/a</span>
             <input type="number" placeholder="MAX" value={upsideMaxInput} onChange={e => setUpsideMaxInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
               style={{ background: D.bg, border: `1px solid ${D.border}`, color: D.text, width: 50, padding: '3px 6px', fontSize: 11, fontFamily: D.mono, textAlign: 'center', borderRadius: 2, outline: 'none' }} />
             <button onClick={applyUpside}
@@ -352,8 +353,8 @@ export default function CompanyExplorer({
                         return (
                           <button
                             onClick={e => { e.stopPropagation(); onToggleWatchlist?.(c.symbol) }}
-                            title={watched ? `Remove ${c.symbol} from watchlist` : `Add ${c.symbol} to watchlist`}
-                            aria-label={watched ? `Remove ${c.symbol} from watchlist` : `Add ${c.symbol} to watchlist`}
+                            title={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
+                            aria-label={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
                             style={{
                               width: 24, height: 21, borderRadius: 2,
                               border: watched ? '1px solid rgba(208,188,255,0.40)' : `1px solid ${D.border}`,
@@ -393,7 +394,7 @@ export default function CompanyExplorer({
                       {c.annualized_volatility_pct.toFixed(1)}%
                     </td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: D.textSec, fontFamily: D.mono, whiteSpace: 'nowrap' }}>
-                      {c.profit_margin_pct != null ? `${c.profit_margin_pct.toFixed(1)}%` : '—'}
+                      {c.profit_margin_pct != null ? `${c.profit_margin_pct.toFixed(1)}%` : 'n/a'}
                     </td>
                     <td style={{ padding: '11px 14px 11px 14px', paddingRight: 18, whiteSpace: 'nowrap' }}>
                       <span style={{

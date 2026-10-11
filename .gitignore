@@ -48,3 +48,6 @@ backups/
 
 # System files
 .DS_Store
+
+# Temp folder used while exporting price history
+public/data/risk_build/

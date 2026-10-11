@@ -58,6 +58,8 @@ export interface WatchlistHook {
   isWatched: (symbol: string) => boolean
   /** Remove all symbols from the watchlist. */
   clear: () => void
+  /** Replace the whole list (used when opening a shared portfolio link). */
+  replaceAll: (symbols: string[]) => void
 }
 
 export function useWatchlist(): WatchlistHook {
@@ -115,5 +117,9 @@ export function useWatchlist(): WatchlistHook {
     updateSymbols([])
   }, [updateSymbols])
 
-  return { symbols, mounted, toggle, add, remove, isWatched, clear }
+  const replaceAll = useCallback((next: string[]) => {
+    updateSymbols(next.map(normalize).filter(Boolean))
+  }, [updateSymbols])
+
+  return { symbols, mounted, toggle, add, remove, isWatched, clear, replaceAll }
 }
