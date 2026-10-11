@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { Building2, Ruler, Gauge, Percent } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import type {
   CompanySummary, SectorSummary, KPIs, ModelErrorBand,
@@ -23,32 +24,41 @@ interface Props {
 
 const ALL = 'All'
 
-// Colours come from the Learn tab palette. Each signal keeps one colour everywhere on this page.
+// Colours come from the Learn tab palette. Every signal has its own colour, used the same way everywhere on this page.
 const C = {
   positive: '#4edea3',
   negative: '#F87171',
   amber: '#F59E0B',
   blue: '#adc6ff',
+  lilac: '#d0bcff',
   grey: '#8c909f',
 }
 
+// Same glass recipe as the Learn tab: blur, a 1px inner ring, a lit top edge, a shadow tinted to the page colour.
+const GLASS =
+  'bg-white/[0.04] backdrop-blur-xl ring-1 ring-inset ring-white/[0.08] ' +
+  'shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_22px_44px_-28px_rgba(4,8,9,0.95)] ' +
+  '[@media(prefers-reduced-transparency:reduce)]:bg-[#1e2020] [@media(prefers-reduced-transparency:reduce)]:backdrop-blur-none'
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#adc6ff]'
 const PRESS = 'transition-[transform,background-color,box-shadow,color] duration-200 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:transform-none'
 const MONO = "[font-family:'JetBrains_Mono',monospace]"
+const RISE = 'animate-[ov-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
+const GRAIN =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")"
 const cssVar = (hex: string) => ({ '--c': hex } as React.CSSProperties)
 
 const SIGNAL_STYLE: Record<string, { barColor: string }> = {
   'Potential Opportunity':                   { barColor: C.positive },
-  'High Volatility Speculative':             { barColor: C.amber    },
   'Stable Watchlist':                        { barColor: C.blue     },
-  'Needs Further Review':                    { barColor: C.grey     },
+  'High Volatility Speculative':             { barColor: C.amber    },
+  'Needs Further Review':                    { barColor: C.lilac    },
   'Weak Fundamentals / Negative Forecast':   { barColor: C.negative },
 }
 
 const MAPE_BAND_COLORS: Record<string, string> = {
   'Elite Reliability':       C.positive,
   'Very Strong Reliability': C.blue,
-  'Strong Reliability':      C.blue,
+  'Strong Reliability':      C.lilac,
   'Moderate Reliability':    C.amber,
   'Higher Error':            C.negative,
 }
@@ -118,153 +128,179 @@ export default function ExecutiveOverview({
     'Weak Fundamentals / Negative Forecast': 'Weak fundamentals together with a negative forecast.',
   }
 
-  const selectClass = `w-full min-h-10 appearance-none rounded-md bg-[#1e2020] py-2 pl-3.5 pr-9 text-[13px] text-[#e2e2e2] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:ring-white/20 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`
+  const selectClass = `w-full min-h-11 appearance-none rounded-lg py-2 pl-4 pr-10 text-[15px] text-[#e2e2e2] ${GLASS} [@media(hover:hover)]:hover:bg-white/[0.07] ${PRESS} ${FOCUS}`
+
+  const stats = k ? [
+    { label: 'Companies',                     value: k.companies.toLocaleString(), sub: 'Companies in this dataset',          color: C.lilac,    Icon: Building2, clickable: true },
+    { label: 'Average forecast error (MAPE)', value: `${k.mape.toFixed(2)}%`,      sub: 'Mean across companies',               color: C.blue,     Icon: Ruler },
+    { label: 'Average volatility',            value: `${k.vol.toFixed(1)}%`,       sub: 'Annualized, mean across companies',   color: C.amber,    Icon: Gauge },
+    { label: 'Average profit margin',         value: `${k.margin.toFixed(1)}%`,    sub: 'Mean across companies',               color: C.positive, Icon: Percent },
+  ] : []
 
   return (
-    <div className="relative font-sans text-[#e2e2e2] antialiased">
+    <div className="relative isolate min-h-dvh w-full overflow-hidden bg-[#121414] font-sans text-[#e2e2e2] antialiased">
+      <style>{'@keyframes ov-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}'}</style>
 
-      {/* Header */}
-      <header className="mb-14 max-w-[720px] lg:mb-16">
-        <h1 className="mb-4 text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.08] tracking-[-0.035em] [text-wrap:balance]">Executive Overview</h1>
-        <p className="text-lg leading-relaxed text-[#c2c6d6] [text-wrap:pretty]">
-          S&P 500 forecast data, risk scores, and model reliability in one place. Built on real backtested models, not black-box outputs.
-        </p>
-      </header>
+      {/* Depth for the glass: the same faint line grid and grain as the Learn tab. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute inset-x-0 top-0 h-[680px] bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(60%_80%_at_28%_0%,#000,transparent)]" />
+        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: GRAIN, backgroundSize: '160px 160px' }} />
+      </div>
 
-      {/* Daily Briefing */}
-      <DailyBriefing
-        companies={companies}
-        sectors={sectors}
-        signalSnapshots={signalSnapshots}
-        signalSummary={signalSummary}
-        watchedSymbols={watchedSymbols}
-        onNavigateToExplorer={onNavigateToExplorer}
-        onNavigateToWatchlist={onNavigateToWatchlist}
-      />
+      <div className="mx-auto w-full max-w-[1320px] px-5 sm:px-8 lg:px-14">
 
-      {/* Filters: these change the figures, signals and chart below */}
-      <section aria-label="Filters" className="mb-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-        {[
-          { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectorOptions },
-          { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signalOptions },
-          { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: riskOptions   },
-        ].map(({ label, val, set, opts }) => (
-          <label key={label} className="block sm:min-w-[180px]">
-            <span className="mb-1.5 block text-xs text-[#8c909f]">{label}</span>
-            <span className="relative block">
-              <select value={val} onChange={e => set(e.target.value)} className={selectClass}>
-                {opts.map(o => (
-                  <option key={o} value={o} className="bg-[#1e2020]">{o}</option>
+        {/* Header: the same pattern as the Learn tab. Title and filters on the left, the lead figure on the right. */}
+        <header className="grid gap-x-14 gap-y-10 pb-12 pt-14 sm:pt-16 lg:grid-cols-12 lg:pb-16 lg:pt-24">
+          <div className="lg:col-span-7">
+            <p className={`${RISE} text-sm text-[#8c909f]`}>Market overview</p>
+            <h1 className={`${RISE} mt-5 text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] [animation-delay:60ms] [text-wrap:balance]`}>
+              Executive{' '}
+              <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text pb-1 text-transparent">Overview</span>
+            </h1>
+            <p className={`${RISE} mt-6 max-w-[48ch] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty]`}>
+              S&P 500 forecast data, risk scores, and model reliability in one place. Built on real backtested models, not black-box outputs.
+            </p>
+
+            {/* Filters: these change the figures, signals and chart below */}
+            <section aria-label="Filters" className={`${RISE} mt-9 [animation-delay:180ms]`}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectorOptions },
+                  { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signalOptions },
+                  { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: riskOptions   },
+                ].map(({ label, val, set, opts }) => (
+                  <label key={label} className="block min-w-0">
+                    <span className="mb-1.5 block text-sm text-[#8c909f]">{label}</span>
+                    <span className="relative block">
+                      <select value={val} onChange={e => set(e.target.value)} className={selectClass}>
+                        {opts.map(o => (
+                          <option key={o} value={o} className="bg-[#1e2020]">{o}</option>
+                        ))}
+                      </select>
+                      <svg aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8c909f]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                    </span>
+                  </label>
                 ))}
-              </select>
-              <svg aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8c909f]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
-            </span>
-          </label>
-        ))}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pb-2 sm:ml-auto">
-          <span className={`${MONO} text-[11px] text-[#8c909f]`}>{hasFilters ? 'Filtering by' : 'No filters applied'}</span>
-          {hasFilters && (
-            <>
-              <span className={`${MONO} text-[11px] text-[#e2e2e2]`}>
-                {[filterSector !== ALL && filterSector, filterSignal !== ALL && filterSignal, filterRisk !== ALL && filterRisk].filter(Boolean).join(', ')}
-              </span>
-              <button type="button" onClick={() => { setFilterSector(ALL); setFilterSignal(ALL); setFilterRisk(ALL) }}
-                className={`min-h-9 rounded-sm px-1.5 text-xs font-medium text-[#F87171] underline decoration-[#F87171]/40 underline-offset-4 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`}>
-                Clear
-              </button>
-            </>
-          )}
-        </div>
-      </section>
+              </div>
+              <div className="mt-3 flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#8c909f]">
+                <span>{hasFilters ? 'Filtering by' : 'No filters applied'}</span>
+                {hasFilters && (
+                  <>
+                    <span className="text-[#e2e2e2]">{[filterSector !== ALL && filterSector, filterSignal !== ALL && filterSignal, filterRisk !== ALL && filterRisk].filter(Boolean).join(', ')}</span>
+                    <button type="button" onClick={() => { setFilterSector(ALL); setFilterSignal(ALL); setFilterRisk(ALL) }}
+                      className={`min-h-9 rounded-sm px-1.5 font-medium text-[#F87171] underline decoration-[#F87171]/40 underline-offset-4 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`}>
+                      Clear
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
 
-      {/* Key figures: one lead figure, four supporting figures. Shown once. */}
-      {k ? (
-        <section aria-labelledby="ov-figures" className="mb-16 lg:mb-20">
-          <h2 id="ov-figures" className="sr-only">Key figures</h2>
-          <div className="grid gap-x-14 gap-y-10 lg:grid-cols-12">
-            <div className="lg:col-span-5">
-              <div className="text-sm text-[#8c909f]">Average 30-day forecast upside</div>
-              <div style={{ color: k.upside >= 0 ? C.positive : C.negative }}
-                className="mt-2 text-[clamp(3.25rem,7vw,5rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums">{formatPercent(k.upside)}</div>
-              <div className={`${MONO} mt-3 text-[11px] text-[#8c909f]`}>Mean of the model&apos;s forecasts</div>
-            </div>
-            <ul className="grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/[0.08] pt-8 lg:col-span-7 lg:border-l lg:border-t-0 lg:pl-14 lg:pt-0">
-              {[
-                { label: 'Companies',     value: k.companies.toLocaleString(), sub: 'Companies in this dataset', color: '#e2e2e2', clickable: true },
-                { label: 'Average forecast error (MAPE)', value: `${k.mape.toFixed(2)}%`, sub: 'Mean across companies', color: C.blue },
-                { label: 'Average volatility', value: `${k.vol.toFixed(1)}%`, sub: 'Annualized, mean across companies', color: '#e2e2e2' },
-                { label: 'Average profit margin', value: `${k.margin.toFixed(1)}%`, sub: 'Mean across companies', color: '#e2e2e2' },
-              ].map(({ label, value, sub, color, clickable }) => {
+          {/* Lead figure */}
+          <aside aria-label="Lead figure" className={`${RISE} self-start rounded-2xl p-7 [animation-delay:240ms] sm:p-8 lg:col-span-5 lg:mt-24 ${GLASS}`}>
+            {k ? (
+              <>
+                <div className="text-[17px] font-medium text-[#c2c6d6]">Average 30-day forecast upside</div>
+                <div className={`mt-4 pb-1 text-[clamp(3.75rem,8vw,5.5rem)] font-semibold leading-none tracking-[-0.045em] tabular-nums ${k.upside >= 0 ? 'bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text text-transparent' : 'text-[#F87171]'}`}>{formatPercent(k.upside)}</div>
+                <p className="mt-5 border-t border-white/[0.08] pt-4 text-[15px] leading-relaxed text-[#8c909f]">
+                  Mean of the model&apos;s 30-day forecasts across {k.companies.toLocaleString()} {k.companies === 1 ? 'company' : 'companies'}.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xl font-medium">No companies match these filters.</p>
+                <p className="mt-2 text-[15px] leading-relaxed text-[#8c909f]">Clear a filter to see the figures again.</p>
+              </>
+            )}
+          </aside>
+        </header>
+
+        {/* Supporting figures: one glass panel, four figures */}
+        {k && (
+          <section aria-labelledby="ov-figures" className="mb-12 lg:mb-14">
+            <h2 id="ov-figures" className="sr-only">Key figures</h2>
+            <ul className={`grid grid-cols-2 overflow-hidden rounded-2xl lg:grid-cols-4 lg:divide-x lg:divide-white/[0.08] ${GLASS}`}>
+              {stats.map(({ label, value, sub, color, Icon, clickable }, i) => {
                 const inner = (
                   <>
-                    <span className="block text-sm text-[#8c909f]">{label}</span>
-                    <span style={{ color }} className="mt-1.5 block text-[clamp(1.75rem,3.2vw,2.25rem)] font-semibold leading-none tracking-[-0.03em] tabular-nums">{value}</span>
-                    <span className={`${MONO} mt-2 block text-[11px] ${clickable ? 'text-[#adc6ff]' : 'text-[#8c909f]'}`}>{clickable ? 'View all in Explorer →' : sub}</span>
+                    <span style={cssVar(color)} className="mb-4 grid size-10 place-items-center rounded-lg bg-[color:color-mix(in_srgb,var(--c)_12%,transparent)] text-[color:var(--c)] ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_22%,transparent)]">
+                      <Icon size={18} strokeWidth={1.5} aria-hidden />
+                    </span>
+                    <span className="block text-[15px] text-[#c2c6d6]">{label}</span>
+                    <span className="mt-2 block text-[clamp(1.875rem,4vw,2.75rem)] font-semibold leading-none tracking-[-0.035em] tabular-nums text-[#e2e2e2]">{value}</span>
+                    <span className={`${MONO} mt-3 block text-xs ${clickable ? 'text-[#adc6ff]' : 'text-[#8c909f]'}`}>{clickable ? 'View all in Explorer →' : sub}</span>
                   </>
                 )
-                return clickable ? (
-                  <li key={label}>
-                    <button type="button" onClick={() => onNavigateToExplorer?.()}
-                      className={`-m-2 rounded-lg p-2 text-left [@media(hover:hover)]:hover:bg-white/[0.04] ${PRESS} ${FOCUS}`}>{inner}</button>
+                const cell = `block h-full w-full p-5 text-left sm:p-7 ${i % 2 === 1 ? 'border-l border-white/[0.08] lg:border-l-0' : ''} ${i >= 2 ? 'border-t border-white/[0.08] lg:border-t-0' : ''}`
+                return (
+                  <li key={label} className="min-w-0">
+                    {clickable ? (
+                      <button type="button" onClick={() => onNavigateToExplorer?.()} className={`${cell} [@media(hover:hover)]:hover:bg-white/[0.05] ${PRESS} ${FOCUS}`}>{inner}</button>
+                    ) : (
+                      <div className={cell}>{inner}</div>
+                    )}
                   </li>
-                ) : (
-                  <li key={label}>{inner}</li>
                 )
               })}
             </ul>
-          </div>
-        </section>
-      ) : (
-        <section className="mb-16 max-w-[56ch] border-t border-white/[0.08] pt-8 lg:mb-20">
-          <p className="text-lg font-medium">No companies match these filters.</p>
-          <p className="mt-2 text-sm leading-relaxed text-[#8c909f]">Clear a filter to see the figures again.</p>
-        </section>
-      )}
+          </section>
+        )}
 
-      {/* Signals (one list, counts shown once) beside model accuracy */}
-      <section className="mb-16 grid gap-x-14 gap-y-14 lg:mb-20 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-7">
-          <h2 className="mb-1 text-xl font-semibold tracking-[-0.02em]">Company count by final signal</h2>
-          <p className="mb-5 text-sm text-[#8c909f]">Select a signal to see its companies in Explorer.</p>
-          <ul className="border-t border-white/[0.08]">
-            {signalData.map(({ name, count }) => {
-              const style = SIGNAL_STYLE[name] ?? { barColor: C.grey }
-              const widthPct = totalSignal > 0 ? (count / totalSignal) * 100 : 0
-              return (
-                <li key={name} className="border-b border-white/[0.08]">
-                  <button type="button" style={cssVar(style.barColor)} onClick={() => onNavigateToExplorer?.(undefined, name)}
-                    aria-label={`${count} companies, ${name}. Open in Explorer`}
-                    className={`group grid min-h-14 w-full grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2.5 px-1 py-4 text-left [@media(hover:hover)]:hover:bg-white/[0.03] ${PRESS} ${FOCUS}`}>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2.5 text-[15px] font-medium text-[#e2e2e2]">
-                        <span aria-hidden className="size-2 shrink-0 rounded-full bg-[color:var(--c)]" />
-                        {name}
+        {/* Daily Briefing */}
+        <DailyBriefing
+          companies={companies}
+          sectors={sectors}
+          signalSnapshots={signalSnapshots}
+          signalSummary={signalSummary}
+          watchedSymbols={watchedSymbols}
+          onNavigateToExplorer={onNavigateToExplorer}
+          onNavigateToWatchlist={onNavigateToWatchlist}
+        />
+
+        {/* Signals (one list, counts shown once) beside model accuracy */}
+        <section className="mb-12 grid gap-x-6 gap-y-6 lg:mb-14 lg:grid-cols-12">
+          <div className={`min-w-0 rounded-2xl p-6 sm:p-7 lg:col-span-7 ${GLASS}`}>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Company count by final signal</h2>
+            <p className="mb-4 mt-1.5 text-[15px] text-[#8c909f]">Select a signal to see its companies in Explorer.</p>
+            <ul className="border-t border-white/[0.08]">
+              {signalData.map(({ name, count }) => {
+                const style = SIGNAL_STYLE[name] ?? { barColor: C.grey }
+                const widthPct = totalSignal > 0 ? (count / totalSignal) * 100 : 0
+                return (
+                  <li key={name} className="border-b border-white/[0.08] last:border-b-0">
+                    <button type="button" style={cssVar(style.barColor)} onClick={() => onNavigateToExplorer?.(undefined, name)}
+                      aria-label={`${count} companies, ${name}. Open in Explorer`}
+                      className={`group -mx-3 grid min-h-16 w-[calc(100%+1.5rem)] grid-cols-[1fr_auto] items-start gap-x-4 gap-y-3 rounded-lg px-3 py-4 text-left [@media(hover:hover)]:hover:bg-white/[0.05] ${PRESS} ${FOCUS}`}>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-3 text-lg font-medium text-[#e2e2e2]">
+                          <span aria-hidden className="size-2.5 shrink-0 rounded-full bg-[color:var(--c)]" />
+                          {name}
+                        </span>
+                        {SIGNAL_DESC[name] && <span className="mt-1 block pl-[22px] text-sm leading-relaxed text-[#8c909f]">{SIGNAL_DESC[name]}</span>}
                       </span>
-                      {SIGNAL_DESC[name] && <span className="mt-1 block pl-[18px] text-xs leading-relaxed text-[#8c909f]">{SIGNAL_DESC[name]}</span>}
-                    </span>
-                    <span className="text-3xl font-semibold leading-none tracking-[-0.02em] tabular-nums text-[color:var(--c)]">{count}</span>
-                    <span className="col-span-2 block h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                      <span className="block h-full rounded-full bg-[color:var(--c)] opacity-80 transition-[width] duration-500 ease-out group-hover:opacity-100 motion-reduce:transition-none" style={{ width: `${widthPct}%` }} />
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-          {k && k.opportunity > 0 && (
-            <p className="mt-5 max-w-[60ch] text-xs leading-relaxed text-[#8c909f]">
-              {k.opportunity} companies are labelled Potential Opportunity, based on the forecast, model reliability, and risk profile.
-            </p>
-          )}
-        </div>
+                      <span className="text-4xl font-semibold leading-none tracking-[-0.03em] tabular-nums text-[color:var(--c)]">{count}</span>
+                      <span className="col-span-2 block h-2 overflow-hidden rounded-full bg-white/[0.07]">
+                        <span className="block h-full rounded-full bg-[color:var(--c)] opacity-85 transition-[width] duration-500 ease-out group-hover:opacity-100 motion-reduce:transition-none" style={{ width: `${widthPct}%` }} />
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            {k && k.opportunity > 0 && (
+              <p className="mt-4 max-w-[60ch] text-sm leading-relaxed text-[#8c909f]">
+                {k.opportunity} companies are labelled Potential Opportunity, based on the forecast, model reliability, and risk profile.
+              </p>
+            )}
+          </div>
 
-        <div className="min-w-0 lg:col-span-5">
-          <h2 className="mb-1 text-xl font-semibold tracking-[-0.02em]">Model error distribution by MAPE band</h2>
-          <p className="mb-5 text-sm text-[#8c909f]">MAPE is the model&apos;s average percentage error on past prices. Lower is better.</p>
-          {modelErrorBands.length > 0 ? (
-            <>
-              <div className="border-t border-white/[0.08] pt-6">
-                <ResponsiveContainer width="100%" height={220}>
+          <div className={`min-w-0 rounded-2xl p-6 sm:p-7 lg:col-span-5 ${GLASS}`}>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Model error by MAPE band</h2>
+            <p className="mb-4 mt-1.5 text-[15px] leading-relaxed text-[#8c909f]">MAPE is the model&apos;s average percentage error on past prices. Lower is better.</p>
+            {modelErrorBands.length > 0 ? (
+              <div className="border-t border-white/[0.08] pt-5">
+                <ResponsiveContainer width="100%" height={330}>
                   <BarChart
                     data={modelErrorBands.map(b => ({
                       name: ({ 'Elite Reliability': 'Elite', 'Very Strong Reliability': 'V. Strong', 'Strong Reliability': 'Strong', 'Moderate Reliability': 'Mod.', 'Higher Error': 'Higher' } as Record<string,string>)[b.model_error_band] ?? b.model_error_band,
@@ -272,53 +308,53 @@ export default function ExecutiveOverview({
                       color: MAPE_BAND_COLORS[b.model_error_band] ?? C.blue,
                       full: b.model_error_band,
                     }))}
-                    barSize={32} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="name" tick={{ fill: C.grey, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: C.grey, fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
-                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={({ active, payload }) => {
+                    barSize={40} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="name" tick={{ fill: C.grey, fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: C.grey, fontSize: 12 }} axisLine={false} tickLine={false} width={32} />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={({ active, payload }) => {
                       if (!active || !payload?.length) return null
                       return (
-                        <div className={`${MONO} rounded-lg bg-[#1e2020] px-3 py-2 text-[11px] text-[#e2e2e2] ring-1 ring-white/10`}>
+                        <div className={`${MONO} rounded-lg bg-[#1e2020] px-3 py-2 text-xs text-[#e2e2e2] ring-1 ring-white/10`}>
                           <div className="mb-0.5 text-[#8c909f]">{payload[0].payload.full}</div>
                           <div className="font-bold" style={{ color: payload[0].payload.color }}>{payload[0].value} companies</div>
                         </div>
                       )
                     }} />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                       {modelErrorBands.map((band, i) => (
-                        <Cell key={i} fill={MAPE_BAND_COLORS[band.model_error_band] ?? C.blue} fillOpacity={0.8} />
+                        <Cell key={i} fill={MAPE_BAND_COLORS[band.model_error_band] ?? C.blue} fillOpacity={0.9} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </>
-          ) : bandsLoaded ? (
-            <p className="border-t border-white/[0.08] pt-6 text-sm leading-relaxed text-[#8c909f]">The error distribution could not be loaded right now. Reload the page to try again.</p>
-          ) : (
-            <div aria-busy="true" aria-label="Loading model error distribution" className="border-t border-white/[0.08] pt-6">
-              <div className="flex h-[220px] items-end justify-around gap-6 px-6">
-                {[40, 100, 55, 8].map((h, i) => (
-                  <span key={i} className="block w-8 animate-pulse rounded-t bg-white/[0.07] motion-reduce:animate-none" style={{ height: `${h}%` }} />
-                ))}
+            ) : bandsLoaded ? (
+              <p className="border-t border-white/[0.08] pt-5 text-[15px] leading-relaxed text-[#8c909f]">The error distribution could not be loaded right now. Reload the page to try again.</p>
+            ) : (
+              <div aria-busy="true" aria-label="Loading model error distribution" className="border-t border-white/[0.08] pt-5">
+                <div className="flex h-[330px] items-end justify-around gap-6 px-6">
+                  {[40, 100, 55, 8].map((h, i) => (
+                    <span key={i} className="block w-10 animate-pulse rounded-t bg-white/[0.07] motion-reduce:animate-none" style={{ height: `${h}%` }} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </section>
+            )}
+          </div>
+        </section>
 
-      {/* Data note */}
-      <section aria-labelledby="ov-data" className="mb-24 max-w-[68ch] border-t border-white/[0.08] pt-8">
-        <h2 id="ov-data" className="mb-2 text-[16px] font-semibold tracking-[-0.01em] text-[#e2e2e2]">About this data</h2>
-        <p className="m-0 text-[13px] leading-relaxed text-[#8c909f] [text-wrap:pretty]">
-          Prices come from Yahoo Finance and are refreshed on weekdays after the US market closes{dataDate ? `. Latest prices: ${dataDate}` : ''}. Company fundamentals such as profit margin come from a static dataset and can lag. {' '}
-          {filtered.length === companies.length
-            ? `All ${companies.length} companies are shown.`
-            : `Showing ${filtered.length} of ${companies.length} companies based on active filters.`}
-        </p>
-      </section>
+        {/* Data note */}
+        <section aria-labelledby="ov-data" className="mb-20 max-w-[72ch] border-t border-white/[0.08] pt-6">
+          <h2 id="ov-data" className="mb-2 text-lg font-semibold tracking-[-0.01em] text-[#e2e2e2]">About this data</h2>
+          <p className="m-0 text-[15px] leading-relaxed text-[#8c909f] [text-wrap:pretty]">
+            Prices come from Yahoo Finance and are refreshed on weekdays after the US market closes{dataDate ? `. Latest prices: ${dataDate}` : ''}. Company fundamentals such as profit margin come from a static dataset and can lag.{' '}
+            {filtered.length === companies.length
+              ? `All ${companies.length} companies are shown.`
+              : `Showing ${filtered.length} of ${companies.length} companies based on active filters.`}
+          </p>
+        </section>
 
+      </div>
     </div>
   )
 }
