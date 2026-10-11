@@ -108,6 +108,29 @@ function TickerTape({ companies }: { companies: CompanySummary[] }) {
   )
 }
 
+// ── Design constants (the ticker tape above keeps its own, unchanged styling) ───
+const SIGNAL_COLOR: Record<string, string> = {
+  'Potential Opportunity':                 '#4edea3',
+  'Stable Watchlist':                      '#adc6ff',
+  'High Volatility Speculative':           '#F59E0B',
+  'Needs Further Review':                  '#d0bcff',
+  'Weak Fundamentals / Negative Forecast': '#F87171',
+}
+const RISK_RANK: Record<string, number> = { 'Low Risk': 1, 'Medium Risk': 2, 'High Risk': 3 }
+
+const GLASS =
+  'bg-white/[0.04] backdrop-blur-xl ring-1 ring-inset ring-white/[0.08] ' +
+  'shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_22px_44px_-28px_rgba(4,8,9,0.95)] ' +
+  '[@media(prefers-reduced-transparency:reduce)]:bg-[#1e2020] [@media(prefers-reduced-transparency:reduce)]:backdrop-blur-none'
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#adc6ff]'
+const PRESS = 'transition-[transform,background-color,box-shadow,color,opacity] duration-200 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:transform-none'
+const MONO = "[font-family:'JetBrains_Mono',monospace]"
+const RISE = 'animate-[ex-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
+const FIELD = `min-h-11 w-full rounded-lg bg-white/[0.04] px-3.5 text-[15px] text-[#e2e2e2] ring-1 ring-inset ring-white/10 placeholder:text-[#8c909f] [@media(hover:hover)]:hover:ring-white/20 ${FOCUS}`
+const GRAIN =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")"
+const cssVar = (hex: string) => ({ '--c': hex } as React.CSSProperties)
+
 export default function CompanyExplorer({
   companies, onViewForecast, onViewAI, initialSector, initialSignal,
   watchedSymbols = [], onToggleWatchlist,
@@ -127,9 +150,16 @@ export default function CompanyExplorer({
 
   const sectors  = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.sector))).sort()], [companies])
   const signals  = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.final_signal))).sort()], [companies])
-  const risks    = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.risk_level))).sort()], [companies])
+  const risks    = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.risk_level))).sort((a, b) => (RISK_RANK[a] ?? 0) - (RISK_RANK[b] ?? 0))], [companies])
 
   const hasFilters = filterSector !== ALL || filterSignal !== ALL || filterRisk !== ALL || upsideMin !== '' || upsideMax !== '' || search !== ''
+
+  const dataDate = useMemo(() => {
+    const dates = companies.map(c => c.latest_date).filter(Boolean)
+    if (!dates.length) return null
+    const [y, m, d] = dates.reduce((a, b) => (a > b ? a : b)).split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }, [companies])
 
   const applyUpside = () => { setUpsideMin(upsideMinInput); setUpsideMax(upsideMaxInput); setPage(0) }
   const resetFilters = () => {
@@ -152,6 +182,11 @@ export default function CompanyExplorer({
   }, [companies, search, filterSector, filterSignal, filterRisk, upsideMin, upsideMax])
 
   const sorted = useMemo(() => [...filtered].sort((a, b) => {
+    // Risk sorts by level (Low, Medium, High), not alphabetically.
+    if (sortKey === 'risk_level') {
+      const d = (RISK_RANK[a.risk_level] ?? 0) - (RISK_RANK[b.risk_level] ?? 0)
+      return sortDir === 'asc' ? d : -d
+    }
     const av = a[sortKey] as any, bv = b[sortKey] as any
     if (av == null) return 1; if (bv == null) return -1
     if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
@@ -167,7 +202,7 @@ export default function CompanyExplorer({
     setPage(0)
   }, [sortKey])
 
-  // Top 12 for bar chart — Stitch style
+  // Top 12 for the bar chart (replaced in a later step)
   const topUpside = useMemo(() =>
     [...filtered]
       .sort((a, b) => b.forecast_30d_upside_pct - a.forecast_30d_upside_pct)
@@ -176,285 +211,238 @@ export default function CompanyExplorer({
 
   const maxUpside = useMemo(() => Math.max(...topUpside.map(c => c.forecast_30d_upside_pct), 1), [topUpside])
 
-  const SortArrow = ({ col }: { col: SortKey }) => (
-    <span style={{ marginLeft: 3, opacity: sortKey === col ? 1 : 0.2, color: sortKey === col ? D.primary : D.textMuted, fontSize: 9 }}>
-      {sortKey === col ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-    </span>
-  )
+  const riskColor = (r: string) => r === 'High Risk' ? '#F87171' : r === 'Medium Risk' ? '#F59E0B' : '#4edea3'
+  const riskDots  = (r: string) => r === 'High Risk' ? 3 : r === 'Medium Risk' ? 2 : 1
+  const riskLabel = (r: string) => r === 'High Risk' ? 'H' : r === 'Medium Risk' ? 'M' : 'L'
 
-  const thStyle: React.CSSProperties = {
-    padding: '10px 14px', textAlign: 'left',
-    fontSize: 10, fontFamily: D.mono, color: D.textMuted,
-    letterSpacing: '0.08em', textTransform: 'uppercase',
-    fontWeight: 500, cursor: 'pointer', userSelect: 'none',
-    whiteSpace: 'nowrap', background: D.surface,
-    borderBottom: `1px solid ${D.border}`,
-  }
+  const columns: { key: SortKey; label: string; align?: 'right' }[] = [
+    { key: 'symbol', label: 'Ticker' },
+    { key: 'company_name', label: 'Name' },
+    { key: 'latest_price', label: 'Price' },
+    { key: 'forecast_30d_upside_pct', label: '30-day forecast' },
+    { key: 'best_model_mape', label: 'MAPE' },
+    { key: 'risk_level', label: 'Risk' },
+    { key: 'annualized_volatility_pct', label: 'Volatility' },
+    { key: 'profit_margin_pct', label: 'Margin' },
+    { key: 'final_signal', label: 'Signal' },
+  ]
 
-  const selectBase: React.CSSProperties = {
-    background: 'transparent', border: 'none',
-    color: D.text, borderRadius: 0, padding: 0,
-    fontSize: 13, fontFamily: D.mono, outline: 'none',
-    cursor: 'pointer', appearance: 'none' as const,
-  }
-
-  const riskColor = (r: string) =>
-    r === 'High Risk' ? D.error : r === 'Medium Risk' ? D.orange : D.tertiary
-  const riskDots  = (r: string) =>
-    r === 'High Risk' ? 3 : r === 'Medium Risk' ? 2 : 1
-  const riskLabel = (r: string) =>
-    r === 'High Risk' ? 'H' : r === 'Medium Risk' ? 'M' : 'L'
+  const iconBtn = `grid size-9 place-items-center rounded-md text-[#c2c6d6] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:bg-white/[0.08] [@media(hover:hover)]:hover:text-white [@media(pointer:coarse)]:size-11 ${PRESS} ${FOCUS}`
+  const pageBtn = `grid h-9 min-w-9 place-items-center rounded-md px-2 text-sm text-[#c2c6d6] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:bg-white/[0.07] disabled:opacity-35 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11 ${PRESS} ${FOCUS}`
 
   return (
     <div style={{ fontFamily: D.body }}>
 
-      {/* ── Live ticker tape ─────────────────────────────────────────────── */}
+      {/* ── Ticker tape: unchanged, kept on top ─────────────────────────── */}
       <TickerTape companies={companies} />
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 32, marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <h1 style={{ fontSize: 'clamp(2.2rem,5vw,3.2rem)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.1, color: D.text, margin: 0 }}>
-            Company{' '}
-            <span style={{ color: '#adc6ff' }}>
-              Explorer
-            </span>
-          </h1>
+      {/* Everything below the tape: same page pattern as the Learn and Overview tabs */}
+      <div className="relative isolate w-full overflow-hidden bg-[#121414] font-sans text-[#e2e2e2] antialiased">
+        <style>{'@keyframes ex-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}'}</style>
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute inset-x-0 top-0 h-[640px] bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(60%_80%_at_28%_0%,#000,transparent)]" />
+          <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: GRAIN, backgroundSize: '160px 160px' }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20, paddingBottom: 4 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6 }}>Companies Analyzed</div>
-            <div style={{ fontSize: 22, fontFamily: D.mono, color: D.text, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1 }}>
-              {filtered.length} <span style={{ color: D.textMuted, fontWeight: 400 }}>/ {companies.length}</span>
+
+        <div className="mx-auto w-full max-w-[1320px] px-5 sm:px-8 lg:px-14">
+
+          {/* ── Header ─────────────────────────────────────────────────── */}
+          <header className="grid gap-x-14 gap-y-8 pb-10 pt-12 sm:pt-14 lg:grid-cols-12 lg:pb-12 lg:pt-16">
+            <div className="lg:col-span-7">
+              <p className={`${RISE} text-sm text-[#8c909f]`}>S&P 500 screener</p>
+              <h1 className={`${RISE} mt-5 text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] [animation-delay:60ms] [text-wrap:balance]`}>
+                Company{' '}
+                <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text pb-1 text-transparent">Explorer</span>
+              </h1>
+              <p className={`${RISE} mt-6 max-w-[48ch] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty]`}>
+                Search, filter, and sort every S&P 500 company by forecast, risk, and signal.
+              </p>
             </div>
-          </div>
-          <div style={{ width: 1, height: 32, background: D.border }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 8, color: D.tertiary, filter: `drop-shadow(0 0 4px ${D.tertiary})` }}>●</span>
-            <span style={{ fontSize: 11, fontFamily: D.mono, color: D.text, letterSpacing: '0.12em' }}>LIVE DATASTREAM</span>
-          </div>
-        </div>
-      </div>
+            <aside aria-label="Results summary" className={`${RISE} self-start rounded-2xl p-6 [animation-delay:200ms] sm:p-7 lg:col-span-5 lg:mt-12 ${GLASS}`}>
+              <div className="text-[17px] font-medium text-[#c2c6d6]">Companies shown</div>
+              <div className="mt-3 flex items-baseline gap-3 text-[clamp(2.75rem,6vw,4rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums">
+                <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text text-transparent">{filtered.length}</span>
+                <span className="text-[0.5em] font-normal text-[#8c909f]">of {companies.length}</span>
+              </div>
+              {dataDate && <p className="mt-5 border-t border-white/[0.08] pt-4 text-[15px] leading-relaxed text-[#8c909f]">Closing prices as of {dataDate}.</p>}
+            </aside>
+          </header>
 
-      {/* ── Filter bar ───────────────────────────────────────────────────── */}
-      <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: '4px 4px 0 0', display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
+          {/* ── Filters ────────────────────────────────────────────────── */}
+          <section aria-labelledby="ex-filters" className={`mb-6 rounded-2xl p-5 sm:p-6 ${GLASS}`}>
+            <h2 id="ex-filters" className="sr-only">Filters</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
+              <label className="block min-w-0 sm:col-span-2 lg:col-span-5">
+                <span className="mb-1.5 block text-sm text-[#8c909f]">Search</span>
+                <span className="relative block">
+                  <Search size={16} strokeWidth={1.5} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c909f]" aria-hidden />
+                  <input type="text" placeholder="Ticker or company name" value={search}
+                    onChange={e => { setSearch(e.target.value); setPage(0) }}
+                    className={`${FIELD} pl-10`} />
+                </span>
+              </label>
+              {[
+                { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectors, span: 'lg:col-span-2' },
+                { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signals, span: 'lg:col-span-3' },
+                { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: risks,   span: 'lg:col-span-2' },
+              ].map(({ label, val, set, opts, span }) => (
+                <label key={label} className={`block min-w-0 ${span}`}>
+                  <span className="mb-1.5 block text-sm text-[#8c909f]">{label}</span>
+                  <span className="relative block">
+                    <select value={val} onChange={e => { set(e.target.value); setPage(0) }} className={`${FIELD} appearance-none pr-10`}>
+                      {opts.map(o => <option key={o} value={o} className="bg-[#1e2020]">{o}</option>)}
+                    </select>
+                    <svg aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8c909f]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                  </span>
+                </label>
+              ))}
+            </div>
 
-        {/* Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRight: `1px solid ${D.border}`, flex: '1 1 200px', minWidth: 180 }}>
-          <Search size={13} style={{ color: D.textMuted, flexShrink: 0 }} />
-          <input
-            type="text" placeholder="TICKER OR COMPANY NAME ..." value={search}
-            onChange={e => { setSearch(e.target.value); setPage(0) }}
-            style={{ background: 'transparent', border: 'none', outline: 'none', color: D.text, fontSize: 12, fontFamily: D.mono, letterSpacing: '0.04em', width: '100%' }}
-          />
-        </div>
+            <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3 border-t border-white/[0.08] pt-4">
+              <fieldset className="m-0 min-w-0 border-0 p-0">
+                <legend className="mb-1.5 p-0 text-sm text-[#8c909f]">Forecast upside range (%)</legend>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <input type="number" inputMode="decimal" aria-label="Minimum upside percent" placeholder="Min" value={upsideMinInput}
+                    onChange={e => setUpsideMinInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
+                    className={`${FIELD} !w-24 text-center ${MONO}`} />
+                  <span className="text-sm text-[#8c909f]">to</span>
+                  <input type="number" inputMode="decimal" aria-label="Maximum upside percent" placeholder="Max" value={upsideMaxInput}
+                    onChange={e => setUpsideMaxInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
+                    className={`${FIELD} !w-24 text-center ${MONO}`} />
+                  <button type="button" onClick={applyUpside}
+                    className={`min-h-11 rounded-lg bg-[#adc6ff] px-5 text-sm font-semibold text-[#002e6a] [@media(hover:hover)]:hover:brightness-110 ${PRESS} ${FOCUS}`}>
+                    Apply
+                  </button>
+                </div>
+              </fieldset>
+              {hasFilters && (
+                <button type="button" onClick={resetFilters}
+                  className={`ml-auto inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#F87171] [@media(hover:hover)]:hover:bg-[#F87171]/10 ${PRESS} ${FOCUS}`}>
+                  <RotateCcw size={14} strokeWidth={1.5} aria-hidden /> Reset filters
+                </button>
+              )}
+            </div>
+          </section>
 
-        {/* Sector */}
-        <div style={{ padding: '8px 16px', borderRight: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 140 }}>
-          <div style={{ fontSize: 9, fontFamily: D.mono, color: `${D.textMuted}80`, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Sector</div>
-          <select value={filterSector} onChange={e => { setFilterSector(e.target.value); setPage(0) }} style={selectBase}>
-            {sectors.map(o => <option key={o} style={{ background: D.container }}>{o}</option>)}
-          </select>
-        </div>
-
-        {/* Signal */}
-        <div style={{ padding: '8px 16px', borderRight: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 160 }}>
-          <div style={{ fontSize: 9, fontFamily: D.mono, color: `${D.textMuted}80`, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Signal</div>
-          <select value={filterSignal} onChange={e => { setFilterSignal(e.target.value); setPage(0) }} style={selectBase}>
-            {signals.map(o => <option key={o} style={{ background: D.container }}>{o}</option>)}
-          </select>
-        </div>
-
-        {/* Risk */}
-        <div style={{ padding: '8px 16px', borderRight: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 110 }}>
-          <div style={{ fontSize: 9, fontFamily: D.mono, color: `${D.textMuted}80`, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Risk</div>
-          <select value={filterRisk} onChange={e => { setFilterRisk(e.target.value); setPage(0) }} style={selectBase}>
-            {risks.map(o => <option key={o} style={{ background: D.container }}>{o}</option>)}
-          </select>
-        </div>
-
-        {/* Upside Range */}
-        <div style={{ padding: '8px 16px', borderRight: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 190 }}>
-          <div style={{ fontSize: 9, fontFamily: D.mono, color: `${D.textMuted}80`, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5 }}>Upside Range (%)</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <input type="number" placeholder="5.0" value={upsideMinInput} onChange={e => setUpsideMinInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
-              style={{ background: D.bg, border: `1px solid ${D.border}`, color: D.text, width: 50, padding: '3px 6px', fontSize: 11, fontFamily: D.mono, textAlign: 'center', borderRadius: 2, outline: 'none' }} />
-            <span style={{ color: D.textMuted, fontSize: 11 }}>n/a</span>
-            <input type="number" placeholder="MAX" value={upsideMaxInput} onChange={e => setUpsideMaxInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
-              style={{ background: D.bg, border: `1px solid ${D.border}`, color: D.text, width: 50, padding: '3px 6px', fontSize: 11, fontFamily: D.mono, textAlign: 'center', borderRadius: 2, outline: 'none' }} />
-            <button onClick={applyUpside}
-              style={{ fontSize: 10, fontFamily: D.mono, color: D.text, background: `${D.primary}18`, border: `1px solid ${D.primary}35`, padding: '3px 8px', borderRadius: 2, cursor: 'pointer', fontWeight: 600 }}>
-              GO
-            </button>
-          </div>
-        </div>
-
-        {/* Reset */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', marginLeft: 'auto' }}>
-          {hasFilters && (
-            <button onClick={resetFilters}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontFamily: D.mono, color: D.error, background: `${D.error}10`, border: `1px solid ${D.error}28`, padding: '5px 10px', borderRadius: 2, cursor: 'pointer' }}>
-              <RotateCcw size={9} /> Reset
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Table ─────────────────────────────────────────────────────────── */}
-      <div style={{ background: D.bg, border: `1px solid ${D.border}`, borderTop: 'none', marginBottom: 28, borderRadius: '0 0 4px 4px' }}>
-        <div style={{ overflowX: 'auto', maxHeight: 520, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-              <tr>
-                <th style={{ ...thStyle, paddingLeft: 18 }}>ACT</th>
-                <th style={{ ...thStyle, width: 30 }}>WL</th>
-                <th style={thStyle} onClick={() => handleSort('symbol')}>Ticker <SortArrow col="symbol" /></th>
-                <th style={thStyle} onClick={() => handleSort('company_name')}>Name <SortArrow col="company_name" /></th>
-                <th style={thStyle} onClick={() => handleSort('latest_price')}>Price <SortArrow col="latest_price" /></th>
-                <th style={thStyle} onClick={() => handleSort('forecast_30d_upside_pct')}>30D Forecast <SortArrow col="forecast_30d_upside_pct" /></th>
-                <th style={thStyle} onClick={() => handleSort('best_model_mape')}>MAPE <SortArrow col="best_model_mape" /></th>
-                <th style={thStyle} onClick={() => handleSort('risk_level')}>Risk Index <SortArrow col="risk_level" /></th>
-                <th style={thStyle} onClick={() => handleSort('annualized_volatility_pct')}>Volatility <SortArrow col="annualized_volatility_pct" /></th>
-                <th style={thStyle} onClick={() => handleSort('profit_margin_pct')}>Margin <SortArrow col="profit_margin_pct" /></th>
-                <th style={{ ...thStyle, paddingRight: 18 }} onClick={() => handleSort('final_signal')}>System Signal <SortArrow col="final_signal" /></th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map(c => {
-                const up = c.forecast_30d_upside_pct
-                const upColor = up >= 0 ? D.tertiary : D.error
-                const rc = riskColor(c.risk_level)
-                const rd = riskDots(c.risk_level)
-                const sc = getSignalColor(c.final_signal)
-                const slabel = signalShortLabel[c.final_signal] ?? c.final_signal
-                return (
-                  <tr key={c.symbol}
-                    style={{ borderBottom: `1px solid ${D.border}`, transition: 'background 0.1s' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(173,198,255,0.025)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
-
-                    <td style={{ padding: '11px 14px 11px 18px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => onViewForecast(c)} title="View Forecast"
-                          style={{ width: 24, height: 21, borderRadius: 2, border: `1px solid ${D.border}`, background: D.container, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: D.primary }}>
-                          <GitBranch size={9} />
-                        </button>
-                        <button onClick={() => onViewAI(c)} title="Ask AI"
-                          style={{ width: 24, height: 21, borderRadius: 2, border: `1px solid ${D.border}`, background: D.container, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: D.secondary }}>
-                          <Bot size={9} />
-                        </button>
-                      </div>
-                    </td>
-
-                    {/* Watchlist bookmark toggle */}
-                    <td style={{ padding: '11px 8px', whiteSpace: 'nowrap' }}>
-                      {(() => {
-                        const watched = watchedSymbols.includes(c.symbol)
-                        return (
-                          <button
+          {/* ── Table ──────────────────────────────────────────────────── */}
+          <section aria-labelledby="ex-table" className={`mb-12 overflow-hidden rounded-2xl lg:mb-14 ${GLASS}`}>
+            <h2 id="ex-table" className="sr-only">Companies</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1040px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-white/[0.08]">
+                    <th scope="col" className="px-4 py-3.5 pl-5 text-sm font-medium text-[#8c909f]">Open</th>
+                    <th scope="col" className="px-2 py-3.5 text-sm font-medium text-[#8c909f]">Save</th>
+                    {columns.map(col => {
+                      const active = sortKey === col.key
+                      return (
+                        <th key={col.key} scope="col" aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-1 py-1.5">
+                          <button type="button" onClick={() => handleSort(col.key)}
+                            className={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap [@media(hover:hover)]:hover:bg-white/[0.06] [@media(pointer:coarse)]:min-h-11 ${active ? 'text-[#adc6ff]' : 'text-[#8c909f]'} ${PRESS} ${FOCUS}`}>
+                            {col.label}
+                            <span aria-hidden className={`text-xs ${active ? 'opacity-100' : 'opacity-30'}`}>{active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</span>
+                          </button>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(c => {
+                    const up = c.forecast_30d_upside_pct
+                    const rc = riskColor(c.risk_level)
+                    const rd = riskDots(c.risk_level)
+                    const sc = SIGNAL_COLOR[c.final_signal] ?? '#8c909f'
+                    const slabel = signalShortLabel[c.final_signal] ?? c.final_signal
+                    const watched = watchedSymbols.includes(c.symbol)
+                    const mapeColor = c.best_model_mape < 2 ? '#4edea3' : c.best_model_mape < 5 ? '#F59E0B' : '#F87171'
+                    return (
+                      <tr key={c.symbol} className="border-b border-white/[0.06] last:border-b-0 [@media(hover:hover)]:hover:bg-white/[0.035]">
+                        <td className="px-4 py-3 pl-5 whitespace-nowrap">
+                          <div className="flex gap-1.5">
+                            <button type="button" onClick={() => onViewForecast(c)} aria-label={`View forecast for ${c.symbol}`} title="View forecast" className={`${iconBtn} text-[#adc6ff]`}>
+                              <GitBranch size={15} strokeWidth={1.5} aria-hidden />
+                            </button>
+                            <button type="button" onClick={() => onViewAI(c)} aria-label={`Ask AI about ${c.symbol}`} title="Ask AI" className={`${iconBtn} text-[#d0bcff]`}>
+                              <Bot size={15} strokeWidth={1.5} aria-hidden />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3 whitespace-nowrap">
+                          <button type="button" aria-pressed={watched}
                             onClick={e => { e.stopPropagation(); onToggleWatchlist?.(c.symbol) }}
                             title={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
                             aria-label={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
-                            style={{
-                              width: 24, height: 21, borderRadius: 2,
-                              border: watched ? '1px solid rgba(208,188,255,0.40)' : `1px solid ${D.border}`,
-                              background: watched ? 'rgba(208,188,255,0.12)' : D.container,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              cursor: onToggleWatchlist ? 'pointer' : 'default',
-                              color: watched ? D.secondary : D.textMuted,
-                              transition: 'color 0.15s, background 0.15s, border-color 0.15s',
-                            }}
-                          >
-                            <Bookmark size={9} fill={watched ? D.secondary : 'none'} />
+                            className={`${iconBtn} ${watched ? '!bg-[#d0bcff]/15 !text-[#d0bcff] !ring-[#d0bcff]/40' : ''}`}>
+                            <Bookmark size={15} strokeWidth={1.5} fill={watched ? '#d0bcff' : 'none'} aria-hidden />
                           </button>
-                        )
-                      })()}
-                    </td>
+                        </td>
+                        <td className={`${MONO} px-4 py-3 text-[16px] font-bold whitespace-nowrap text-[#e2e2e2]`}>{c.symbol}</td>
+                        <td className="max-w-[220px] truncate px-4 py-3 text-[15px] text-[#c2c6d6]" title={c.company_name}>{c.company_name}</td>
+                        <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums text-[#e2e2e2]`}>{formatCurrency(c.latest_price)}</td>
+                        <td className={`${MONO} px-4 py-3 text-[15px] font-semibold whitespace-nowrap tabular-nums ${up >= 0 ? 'text-[#4edea3]' : 'text-[#F87171]'}`}>{up >= 0 ? '+' : ''}{up.toFixed(1)}%</td>
+                        <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums`} style={{ color: mapeColor }}>{c.best_model_mape.toFixed(1)}%</td>
+                        <td className="px-4 py-3 whitespace-nowrap" title={c.risk_level}>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="sr-only">{c.risk_level}</span>
+                            <span aria-hidden className="flex gap-0.5">
+                              {[1, 2, 3].map(d => <span key={d} className="block h-4 w-1 rounded-full" style={{ background: d <= rd ? rc : 'rgba(255,255,255,0.12)' }} />)}
+                            </span>
+                            <span aria-hidden className={`${MONO} text-xs`} style={{ color: rc }}>{riskLabel(c.risk_level)}</span>
+                          </span>
+                        </td>
+                        <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums text-[#c2c6d6]`}>{c.annualized_volatility_pct.toFixed(1)}%</td>
+                        <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums text-[#c2c6d6]`}>{c.profit_margin_pct != null ? `${c.profit_margin_pct.toFixed(1)}%` : 'n/a'}</td>
+                        <td className="px-4 py-3 pr-5 whitespace-nowrap">
+                          <span style={cssVar(sc)} className={`${MONO} inline-block rounded-[4px] bg-[color:color-mix(in_srgb,var(--c)_10%,transparent)] px-2 py-1 text-[11px] font-medium text-[color:var(--c)] ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_30%,transparent)]`}>{slabel}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!paginated.length && (
+                    <tr><td colSpan={11} className="px-6 py-14 text-center">
+                      <p className="text-lg font-medium text-[#e2e2e2]">No companies match your filters.</p>
+                      <p className="mt-1.5 text-[15px] text-[#8c909f]">Reset the filters to see all {companies.length} companies.</p>
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-                    <td style={{ padding: '11px 14px', fontSize: 14, fontWeight: 700, color: D.text, fontFamily: D.mono, whiteSpace: 'nowrap' }}>{c.symbol}</td>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: D.textSec, maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company_name}</td>
-                    <td style={{ padding: '11px 14px', fontSize: 13, color: D.text, fontFamily: D.mono, whiteSpace: 'nowrap' }}>{formatCurrency(c.latest_price)}</td>
-                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 600, color: upColor, fontFamily: D.mono, whiteSpace: 'nowrap' }}>
-                      {up >= 0 ? '+' : ''}{up.toFixed(1)}%
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: c.best_model_mape < 2 ? D.tertiary : c.best_model_mape < 5 ? D.orange : D.error, fontFamily: D.mono, whiteSpace: 'nowrap' }}>
-                      {c.best_model_mape.toFixed(1)}%
-                    </td>
-                    <td style={{ padding: '11px 14px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <div style={{ display: 'flex', gap: 2 }}>
-                          {[1,2,3].map(d => (
-                            <div key={d} style={{ width: 3, height: 13, borderRadius: 2, background: d <= rd ? rc : D.border }} />
-                          ))}
-                        </div>
-                        <span style={{ fontSize: 10, fontFamily: D.mono, color: rc }}>{riskLabel(c.risk_level)}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: D.textSec, fontFamily: D.mono, whiteSpace: 'nowrap' }}>
-                      {c.annualized_volatility_pct.toFixed(1)}%
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: D.textSec, fontFamily: D.mono, whiteSpace: 'nowrap' }}>
-                      {c.profit_margin_pct != null ? `${c.profit_margin_pct.toFixed(1)}%` : 'n/a'}
-                    </td>
-                    <td style={{ padding: '11px 14px 11px 14px', paddingRight: 18, whiteSpace: 'nowrap' }}>
-                      <span style={{
-                        display: 'inline-block', fontSize: 9, fontFamily: D.mono, letterSpacing: '0.06em',
-                        color: sc, background: `${sc}14`, border: `1px solid ${sc}30`,
-                        padding: '3px 6px', borderRadius: 2, textTransform: 'uppercase',
-                      }}>
-                        {slabel}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-              {!paginated.length && (
-                <tr><td colSpan={11} style={{ padding: 48, textAlign: 'center', color: D.textMuted, fontSize: 13, fontFamily: D.mono }}>
-                  No companies match your filters.
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            {/* Pagination */}
+            <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] px-5 py-3.5">
+              <span className="text-sm tabular-nums text-[#8c909f]">
+                Showing {sorted.length > 0 ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, sorted.length)}` : '0'} of {sorted.length} companies
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className={pageBtn}>‹</button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const p = Math.max(0, Math.min(page - 2, totalPages - 5)) + i
+                  const on = p === page
+                  return (
+                    <button key={p} type="button" onClick={() => setPage(p)} aria-current={on ? 'page' : undefined} aria-label={`Page ${p + 1}`}
+                      className={`${pageBtn} tabular-nums ${on ? '!bg-[#adc6ff]/15 !text-[#adc6ff] !ring-[#adc6ff]/50' : ''}`}>{p + 1}</button>
+                  )
+                })}
+                {totalPages > 5 && page < totalPages - 3 && (
+                  <>
+                    <span aria-hidden className="px-1 text-sm text-[#8c909f]">…</span>
+                    <button type="button" onClick={() => setPage(totalPages - 1)} aria-label={`Page ${totalPages}`} className={`${pageBtn} tabular-nums`}>{totalPages}</button>
+                  </>
+                )}
+                <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Next page" className={pageBtn}>›</button>
+              </div>
+            </nav>
+          </section>
 
-        {/* Pagination */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderTop: `1px solid ${D.border}`, flexWrap: 'wrap', gap: 8 }}>
-          <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted }}>
-            Showing {sorted.length > 0 ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, sorted.length)}` : '0'} of {sorted.length} companies
-          </span>
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-              style={{ width: 26, height: 26, border: `1px solid ${D.border}`, background: D.container, color: D.textSec, fontSize: 13, borderRadius: 2, cursor: 'pointer', opacity: page === 0 ? 0.3 : 1, fontFamily: D.mono }}>‹</button>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const p = Math.max(0, Math.min(page - 2, totalPages - 5)) + i
-              return (
-                <button key={p} onClick={() => setPage(p)}
-                  style={{ minWidth: 30, height: 26, border: `1px solid ${p === page ? D.primary : D.border}`, background: p === page ? `${D.primary}18` : D.container, color: p === page ? D.primary : D.textSec, fontSize: 11, fontFamily: D.mono, borderRadius: 2, cursor: 'pointer', padding: '0 6px' }}>
-                  {p + 1}
-                </button>
-              )
-            })}
-            {totalPages > 5 && page < totalPages - 3 && (
-              <>
-                <span style={{ color: D.textMuted, fontSize: 11, padding: '0 3px' }}>…</span>
-                <button onClick={() => setPage(totalPages - 1)}
-                  style={{ minWidth: 30, height: 26, border: `1px solid ${D.border}`, background: D.container, color: D.textSec, fontSize: 11, fontFamily: D.mono, borderRadius: 2, cursor: 'pointer', padding: '0 6px' }}>
-                  {totalPages}
-                </button>
-              </>
-            )}
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-              style={{ width: 26, height: 26, border: `1px solid ${D.border}`, background: D.container, color: D.textSec, fontSize: 13, borderRadius: 2, cursor: 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1, fontFamily: D.mono }}>›</button>
-          </div>
-        </div>
-      </div>
-
+          {/* ── Top companies chart (legacy styling, replaced in a later step) ── */}
+          <section aria-labelledby="ex-chart-legacy" className="mb-20">
       {/* ── Top Companies — Stitch bar chart ─────────────────────────────── */}
       <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 4 }}>
         {/* Section header with horizontal rule */}
         <div style={{ padding: '18px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: D.text, fontFamily: D.body, whiteSpace: 'nowrap' }}>Top Companies by 30-Day Forecast Upside</span>
+            <h2 id="ex-chart-legacy" style={{ fontSize: 14, fontWeight: 600, color: D.text, fontFamily: D.body, whiteSpace: 'nowrap', margin: 0 }}>Top Companies by 30-Day Forecast Upside</h2>
             <div style={{ flex: 1, height: 1, background: D.border, minWidth: 40 }} />
           </div>
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
@@ -519,6 +507,10 @@ export default function CompanyExplorer({
         </div>
       </div>
 
+          </section>
+
+        </div>
+      </div>
     </div>
   )
 }
