@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { TrendingUp, AlertTriangle, Eye, Clock, BarChart2, Activity, CheckCircle } from 'lucide-react'
+import { CheckCircle } from 'lucide-react'
 import type {
   CompanySummary, SectorSummary, KPIs, ModelErrorBand,
   SignalSnapshot, SignalPerformanceSummary,
@@ -35,9 +35,7 @@ const C = {
 
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#adc6ff]'
 const PRESS = 'transition-[transform,background-color,box-shadow,color] duration-200 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:transform-none'
-const HOVER_CARD = '[@media(hover:hover)]:hover:bg-white/[0.055] [@media(hover:hover)]:hover:ring-white/[0.16]'
 const MONO = "[font-family:'JetBrains_Mono',monospace]"
-const SURFACE = 'rounded-xl bg-white/[0.03] ring-1 ring-inset ring-white/[0.08]'
 const cssVar = (hex: string) => ({ '--c': hex } as React.CSSProperties)
 
 const SIGNAL_STYLE: Record<string, { barColor: string }> = {
@@ -114,31 +112,26 @@ export default function ExecutiveOverview({
     return (weighted / (total * 100) * 100).toFixed(1)
   }, [modelErrorBands])
 
-  const SIGNAL_CARDS = k ? [
-    { label: 'Opportunities', desc: 'Stocks with adaptive forecast alpha and low variance signals.',     key: 'Potential Opportunity',       Icon: TrendingUp,    accent: C.positive, tag: 'PRIME',  count: k.opportunity },
-    { label: 'Speculative',   desc: 'High momentum names with extreme volatility characteristics.',      key: 'High Volatility Speculative', Icon: AlertTriangle, accent: C.amber,    tag: 'ALERT',  count: k.speculative },
-    { label: 'Stable Watch',  desc: 'Consistent performers with high model confidence scores.',          key: 'Stable Watchlist',            Icon: Eye,           accent: C.blue,     tag: 'SECURE', count: k.watchlist   },
-    { label: 'Needs Review',  desc: 'Data points with anomalous patterns requiring manual verification.', key: 'Needs Further Review',        Icon: Clock,         accent: C.grey,     tag: 'ACTION', count: k.review      },
-  ] : []
-
-  const SHORT_LABEL: Record<string, string> = {
-    'Potential Opportunity': 'Opportunity', 'High Volatility Speculative': 'High Vol.',
-    'Stable Watchlist': 'Stable Watch.', 'Needs Further Review': 'Needs Review',
-    'Weak Fundamentals / Negative Forecast': 'Weak / Neg.',
+  // One description per signal, shown once in the Signals section (copy is revised in a later step).
+  const SIGNAL_DESC: Record<string, string> = {
+    'Potential Opportunity':       'Stocks with adaptive forecast alpha and low variance signals.',
+    'High Volatility Speculative': 'High momentum names with extreme volatility characteristics.',
+    'Stable Watchlist':            'Consistent performers with high model confidence scores.',
+    'Needs Further Review':        'Data points with anomalous patterns requiring manual verification.',
   }
 
-  const selectClass = `w-full appearance-none rounded-full bg-[#1e2020] py-2 pl-5 pr-9 text-xs font-medium text-[#e2e2e2] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:ring-white/20 ${PRESS} ${FOCUS}`
+  const selectClass = `w-full appearance-none rounded-full bg-[#1e2020] py-2 pl-5 pr-9 text-xs font-medium text-[#e2e2e2] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:ring-white/20 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`
 
   return (
     <div className="relative font-sans text-[#e2e2e2] antialiased">
 
-      {/* Hero */}
-      <section className="mb-12">
+      {/* Header */}
+      <header className="mb-14 max-w-[720px] lg:mb-16">
         <h1 className="mb-4 text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.08] tracking-[-0.035em] [text-wrap:balance]">Executive Overview</h1>
-        <p className="max-w-[640px] text-lg leading-relaxed text-[#c2c6d6] [text-wrap:pretty]">
+        <p className="text-lg leading-relaxed text-[#c2c6d6] [text-wrap:pretty]">
           S&P 500 forecast data, risk scores, and model reliability in one place. Built on real backtested models, not black-box outputs.
         </p>
-      </section>
+      </header>
 
       {/* Daily Briefing */}
       <DailyBriefing
@@ -151,14 +144,14 @@ export default function ExecutiveOverview({
         onNavigateToWatchlist={onNavigateToWatchlist}
       />
 
-      {/* Filter row */}
-      <section aria-label="Filters" className="mb-12 flex flex-wrap items-center gap-3">
+      {/* Filters: these change the figures, signals and chart below */}
+      <section aria-label="Filters" className="mb-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         {[
           { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectorOptions },
           { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signalOptions },
           { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: riskOptions   },
         ].map(({ label, val, set, opts }) => (
-          <div key={label} className="relative">
+          <div key={label} className="relative sm:min-w-[170px]">
             <select value={val} onChange={e => set(e.target.value)} aria-label={`Filter by ${label.toLowerCase()}`} className={selectClass}>
               {opts.map(o => (
                 <option key={o} value={o} className="bg-[#1e2020]">{o === ALL ? `${label}: All` : o}</option>
@@ -167,7 +160,7 @@ export default function ExecutiveOverview({
             <svg aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8c909f]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
           </div>
         ))}
-        <div className="ml-auto flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:ml-auto">
           <span className={`${MONO} text-[11px] text-[#8c909f]`}>{hasFilters ? 'Filters:' : 'Filters Applied: None'}</span>
           {hasFilters && (
             <>
@@ -175,7 +168,7 @@ export default function ExecutiveOverview({
                 {[filterSector !== ALL && filterSector, filterSignal !== ALL && filterSignal, filterRisk !== ALL && filterRisk].filter(Boolean).join(', ')}
               </span>
               <button type="button" onClick={() => { setFilterSector(ALL); setFilterSignal(ALL); setFilterRisk(ALL) }}
-                className={`rounded-sm px-1.5 py-1 text-xs font-medium text-[#F87171] underline decoration-[#F87171]/40 underline-offset-4 ${PRESS} ${FOCUS}`}>
+                className={`min-h-9 rounded-sm px-1.5 text-xs font-medium text-[#F87171] underline decoration-[#F87171]/40 underline-offset-4 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`}>
                 Clear
               </button>
             </>
@@ -183,105 +176,94 @@ export default function ExecutiveOverview({
         </div>
       </section>
 
-      {/* Key figures */}
-      {k && (
-        <section aria-labelledby="ov-figures" className="mb-12">
+      {/* Key figures: one lead figure, four supporting figures. Shown once. */}
+      {k ? (
+        <section aria-labelledby="ov-figures" className="mb-16 lg:mb-20">
           <h2 id="ov-figures" className="sr-only">Key figures</h2>
-          <div className="grid grid-cols-5 gap-4">
-            {[
-              { label: 'Companies',      value: k.companies.toLocaleString(), sub: 'Active in universe',  color: '#e2e2e2', clickable: true },
-              { label: 'Avg 30D Upside', value: formatPercent(k.upside),      sub: 'Model forecast mean', color: k.upside >= 0 ? C.positive : C.negative },
-              { label: 'Model MAPE',     value: `${k.mape.toFixed(2)}%`,      sub: 'System error margin', color: C.blue },
-              { label: 'Volatility',     value: `${k.vol.toFixed(1)}%`,       sub: 'Aggregate index',     color: '#e2e2e2' },
-              { label: 'Profit Margin',  value: `${k.margin.toFixed(1)}%`,    sub: 'Mean sector yield',   color: '#e2e2e2' },
-            ].map(({ label, value, sub, color, clickable }) => {
-              const inner = (
-                <>
-                  <span className="text-xs text-[#8c909f]">{label}</span>
-                  <span className="block">
-                    <span style={{ color }} className="mb-1.5 block text-[32px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</span>
-                    <span className={`${MONO} block text-[10px] ${clickable ? 'text-[#adc6ff]' : 'text-[#8c909f]'}`}>{clickable ? 'View all in Explorer →' : sub}</span>
-                  </span>
-                </>
-              )
-              const base = `${SURFACE} flex min-h-[130px] flex-col justify-between p-6 text-left`
-              return clickable ? (
-                <button key={label} type="button" onClick={() => onNavigateToExplorer?.()} className={`${base} ${HOVER_CARD} ${PRESS} ${FOCUS}`}>{inner}</button>
-              ) : (
-                <div key={label} className={base}>{inner}</div>
-              )
-            })}
+          <div className="grid gap-x-14 gap-y-10 lg:grid-cols-12">
+            <div className="lg:col-span-5">
+              <div className="text-sm text-[#8c909f]">Avg 30D Upside</div>
+              <div style={{ color: k.upside >= 0 ? C.positive : C.negative }}
+                className="mt-2 text-[clamp(3.25rem,7vw,5rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums">{formatPercent(k.upside)}</div>
+              <div className={`${MONO} mt-3 text-[11px] text-[#8c909f]`}>Model forecast mean</div>
+            </div>
+            <ul className="grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/[0.08] pt-8 lg:col-span-7 lg:border-l lg:border-t-0 lg:pl-14 lg:pt-0">
+              {[
+                { label: 'Companies',     value: k.companies.toLocaleString(), sub: 'Active in universe',  color: '#e2e2e2', clickable: true },
+                { label: 'Model MAPE',    value: `${k.mape.toFixed(2)}%`,      sub: 'System error margin', color: C.blue },
+                { label: 'Volatility',    value: `${k.vol.toFixed(1)}%`,       sub: 'Aggregate index',     color: '#e2e2e2' },
+                { label: 'Profit Margin', value: `${k.margin.toFixed(1)}%`,    sub: 'Mean sector yield',   color: '#e2e2e2' },
+              ].map(({ label, value, sub, color, clickable }) => {
+                const inner = (
+                  <>
+                    <span className="block text-sm text-[#8c909f]">{label}</span>
+                    <span style={{ color }} className="mt-1.5 block text-[clamp(1.75rem,3.2vw,2.25rem)] font-semibold leading-none tracking-[-0.03em] tabular-nums">{value}</span>
+                    <span className={`${MONO} mt-2 block text-[10px] ${clickable ? 'text-[#adc6ff]' : 'text-[#8c909f]'}`}>{clickable ? 'View all in Explorer →' : sub}</span>
+                  </>
+                )
+                return clickable ? (
+                  <li key={label}>
+                    <button type="button" onClick={() => onNavigateToExplorer?.()}
+                      className={`-m-2 rounded-lg p-2 text-left [@media(hover:hover)]:hover:bg-white/[0.04] ${PRESS} ${FOCUS}`}>{inner}</button>
+                  </li>
+                ) : (
+                  <li key={label}>{inner}</li>
+                )
+              })}
+            </ul>
           </div>
+        </section>
+      ) : (
+        <section className="mb-16 max-w-[56ch] border-t border-white/[0.08] pt-8 lg:mb-20">
+          <p className="text-lg font-medium">No companies match these filters.</p>
+          <p className="mt-2 text-sm leading-relaxed text-[#8c909f]">Clear a filter to see the figures again.</p>
         </section>
       )}
 
-      {/* Signal categories */}
-      {k && SIGNAL_CARDS.length > 0 && (
-        <section aria-labelledby="ov-signals" className="mb-12">
-          <h2 id="ov-signals" className="sr-only">Signal categories</h2>
-          <div className="grid grid-cols-4 gap-4">
-            {SIGNAL_CARDS.map(({ label, desc, key, Icon, accent, tag, count }) => (
-              <button key={label} type="button" style={cssVar(accent)} onClick={() => onNavigateToExplorer?.(undefined, key)}
-                aria-label={`${count} companies, ${label}. Open in Explorer`}
-                className={`${SURFACE} border-l-2 border-l-[color:var(--c)] p-6 text-left [@media(hover:hover)]:hover:-translate-y-0.5 ${HOVER_CARD} ${PRESS} ${FOCUS} motion-reduce:hover:transform-none`}>
-                <span className="mb-5 flex items-start justify-between">
-                  <Icon size={18} strokeWidth={1.5} className="text-[color:var(--c)]" aria-hidden />
-                  <span className={`${MONO} rounded-[4px] bg-[color:color-mix(in_srgb,var(--c)_12%,transparent)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--c)]`}>{tag}</span>
-                </span>
-                <span className="mb-2.5 block text-4xl font-semibold leading-none tracking-[-0.02em] tabular-nums text-[color:var(--c)]">{count}</span>
-                <span className="mb-1.5 block text-[17px] font-semibold leading-tight tracking-[-0.01em] text-[#e2e2e2]">{label}</span>
-                <span className="block text-xs leading-relaxed text-[#8c909f]">{desc}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Charts */}
-      <section className="mb-6 grid grid-cols-2 gap-4">
-
-        {/* Signal distribution */}
-        <div className={`${SURFACE} overflow-hidden`}>
-          <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Company Count by Final Signal</h2>
-            <BarChart2 size={15} strokeWidth={1.5} className="text-[#8c909f]" aria-hidden />
-          </div>
-          <div className="flex flex-col gap-3.5 p-6">
+      {/* Signals (one list, counts shown once) beside model accuracy */}
+      <section className="mb-16 grid gap-x-14 gap-y-14 lg:mb-20 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-7">
+          <h2 className="mb-1 text-xl font-semibold tracking-[-0.02em]">Company count by final signal</h2>
+          <p className="mb-5 text-sm text-[#8c909f]">Select a signal to see its companies in Explorer.</p>
+          <ul className="border-t border-white/[0.08]">
             {signalData.map(({ name, count }) => {
               const style = SIGNAL_STYLE[name] ?? { barColor: C.grey }
               const widthPct = totalSignal > 0 ? (count / totalSignal) * 100 : 0
               return (
-                <button key={name} type="button" style={cssVar(style.barColor)} onClick={() => onNavigateToExplorer?.(undefined, name)}
-                  aria-label={`${count} companies, ${SHORT_LABEL[name] ?? name}. Open in Explorer`}
-                  className={`group flex items-center gap-3 rounded-md text-left ${PRESS} ${FOCUS}`}>
-                  <span className={`${MONO} w-[88px] shrink-0 text-[10px] text-[#8c909f]`}>{SHORT_LABEL[name] ?? name}</span>
-                  <span className="relative block h-[22px] flex-1 rounded-[4px] bg-white/[0.05]">
-                    <span className="absolute inset-y-0 left-0 block rounded-[4px] bg-[color:var(--c)] opacity-70 transition-[width,opacity] duration-500 ease-out group-hover:opacity-90 motion-reduce:transition-none" style={{ width: `${widthPct}%` }} />
-                    <span className={`${MONO} absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-semibold tabular-nums text-white`}>{count}</span>
-                  </span>
-                </button>
+                <li key={name} className="border-b border-white/[0.08]">
+                  <button type="button" style={cssVar(style.barColor)} onClick={() => onNavigateToExplorer?.(undefined, name)}
+                    aria-label={`${count} companies, ${name}. Open in Explorer`}
+                    className={`group grid min-h-14 w-full grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2.5 px-1 py-4 text-left [@media(hover:hover)]:hover:bg-white/[0.03] ${PRESS} ${FOCUS}`}>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2.5 text-[15px] font-medium text-[#e2e2e2]">
+                        <span aria-hidden className="size-2 shrink-0 rounded-full bg-[color:var(--c)]" />
+                        {name}
+                      </span>
+                      {SIGNAL_DESC[name] && <span className="mt-1 block pl-[18px] text-xs leading-relaxed text-[#8c909f]">{SIGNAL_DESC[name]}</span>}
+                    </span>
+                    <span className="text-3xl font-semibold leading-none tracking-[-0.02em] tabular-nums text-[color:var(--c)]">{count}</span>
+                    <span className="col-span-2 block h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                      <span className="block h-full rounded-full bg-[color:var(--c)] opacity-80 transition-[width] duration-500 ease-out group-hover:opacity-100 motion-reduce:transition-none" style={{ width: `${widthPct}%` }} />
+                    </span>
+                  </button>
+                </li>
               )
             })}
-            {k && k.opportunity > 0 && (
-              <div className="mt-2 border-t border-white/[0.08] pt-3.5">
-                <p className="m-0 text-xs leading-normal text-[#8c909f]">
-                  {k.opportunity} companies meet the Potential Opportunity criteria based on adaptive forecast, model reliability, and risk profile.
-                </p>
-              </div>
-            )}
-          </div>
+          </ul>
+          {k && k.opportunity > 0 && (
+            <p className="mt-5 max-w-[60ch] text-xs leading-relaxed text-[#8c909f]">
+              {k.opportunity} companies meet the Potential Opportunity criteria based on adaptive forecast, model reliability, and risk profile.
+            </p>
+          )}
         </div>
 
-        {/* Model error distribution */}
-        <div className={`${SURFACE} overflow-hidden`}>
-          <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Model Error Distribution by MAPE Band</h2>
-            <Activity size={15} strokeWidth={1.5} className="text-[#8c909f]" aria-hidden />
-          </div>
-          <div className="p-8">
-            {modelErrorBands.length > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height={192}>
+        <div className="min-w-0 lg:col-span-5">
+          <h2 className="mb-1 text-xl font-semibold tracking-[-0.02em]">Model error distribution by MAPE band</h2>
+          <p className="mb-5 text-sm text-[#8c909f]">Companies grouped by how closely the model tracked them.</p>
+          {modelErrorBands.length > 0 ? (
+            <>
+              <div className="border-t border-white/[0.08] pt-6">
+                <ResponsiveContainer width="100%" height={220}>
                   <BarChart
                     data={modelErrorBands.map(b => ({
                       name: ({ 'Elite Reliability': 'Elite', 'Very Strong Reliability': 'V. Strong', 'Strong Reliability': 'Strong', 'Moderate Reliability': 'Mod.', 'Higher Error': 'Higher' } as Record<string,string>)[b.model_error_band] ?? b.model_error_band,
@@ -289,7 +271,7 @@ export default function ExecutiveOverview({
                       color: MAPE_BAND_COLORS[b.model_error_band] ?? C.blue,
                       full: b.model_error_band,
                     }))}
-                    barSize={36} margin={{ top: 16, right: 8, bottom: 8, left: 0 }}>
+                    barSize={32} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
                     <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="name" tick={{ fill: C.grey, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: C.grey, fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
@@ -309,49 +291,31 @@ export default function ExecutiveOverview({
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex items-center justify-between border-t border-white/[0.08] pt-4">
-                  <span className={`${MONO} text-[10px] text-[#8c909f]`}>Reliability Index</span>
-                  <span className={`${MONO} text-xs font-bold tabular-nums text-[#adc6ff]`}>{reliabilityIndex}/100</span>
-                </div>
-              </>
-            ) : (
-              <div className="flex h-48 items-center justify-center text-[13px] text-[#8c909f]">Loading…</div>
-            )}
-          </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-white/[0.08] pt-4">
+                <span className={`${MONO} text-[10px] text-[#8c909f]`}>Reliability Index</span>
+                <span className={`${MONO} text-xs font-bold tabular-nums text-[#adc6ff]`}>{reliabilityIndex}/100</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex h-56 items-center justify-center border-t border-white/[0.08] text-[13px] text-[#8c909f]">Loading…</div>
+          )}
         </div>
       </section>
 
-      {/* System integrity */}
-      <section className={`${SURFACE} flex flex-wrap items-center justify-between gap-6 p-8`}>
-        <div className="min-w-[280px] flex-1">
-          <div className="mb-2.5 flex items-center gap-2">
-            <CheckCircle size={14} strokeWidth={1.5} className="text-[#F59E0B]" aria-hidden />
-            <span className={`${MONO} text-[11px] text-[#F59E0B]`}>System Integrity · Secure</span>
-          </div>
-          <h2 className="mb-2 text-xl font-semibold tracking-[-0.01em]">Real-time Data Validation</h2>
-          <p className="m-0 text-[13px] leading-relaxed text-[#8c909f]">
-            Dashboard data sourced from Databricks pipeline.{' '}
-            {filtered.length === companies.length
-              ? `All ${companies.length} S&P 500 companies loaded. CSV-based static deployment. Refresh for latest exported data.`
-              : `Showing ${filtered.length} of ${companies.length} companies based on active filters.`}
-          </p>
+      {/* Data note */}
+      <section className="mb-24 max-w-[68ch] border-t border-white/[0.08] pt-8">
+        <div className="mb-2.5 flex items-center gap-2">
+          <CheckCircle size={14} strokeWidth={1.5} className="text-[#F59E0B]" aria-hidden />
+          <span className={`${MONO} text-[11px] text-[#F59E0B]`}>System Integrity · Secure</span>
         </div>
-        {k && (
-          <div className="flex shrink-0 gap-9">
-            {[
-              { v: k.companies.toLocaleString(), l: 'Co.' },
-              { v: formatPercent(k.upside), l: 'Up%' },
-              { v: `${k.mape.toFixed(1)}%`, l: 'MAPE' },
-              { v: `${k.vol.toFixed(0)}%`, l: 'Vol' },
-              { v: `${k.margin.toFixed(0)}%`, l: 'Mgn' },
-            ].map(({ v, l }) => (
-              <div key={l} className="text-right">
-                <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{v}</div>
-                <div className={`${MONO} mt-1 text-[10px] text-[#8c909f]`}>{l}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <h2 className="mb-2 text-xl font-semibold tracking-[-0.01em]">Real-time Data Validation</h2>
+        <p className="m-0 text-[13px] leading-relaxed text-[#8c909f]">
+          Dashboard data sourced from Databricks pipeline.{' '}
+          {filtered.length === companies.length
+            ? `All ${companies.length} S&P 500 companies loaded. CSV-based static deployment. Refresh for latest exported data.`
+            : `Showing ${filtered.length} of ${companies.length} companies based on active filters.`}
+        </p>
       </section>
 
     </div>
