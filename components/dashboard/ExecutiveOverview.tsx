@@ -199,7 +199,7 @@ export default function ExecutiveOverview({
                   <>
                     <span className="block text-sm text-[#8c909f]">{label}</span>
                     <span style={{ color }} className="mt-1.5 block text-[clamp(1.75rem,3.2vw,2.25rem)] font-semibold leading-none tracking-[-0.03em] tabular-nums">{value}</span>
-                    <span className={`${MONO} mt-2 block text-[10px] ${clickable ? 'text-[#adc6ff]' : 'text-[#8c909f]'}`}>{clickable ? 'View all in Explorer →' : sub}</span>
+                    <span className={`${MONO} mt-2 block text-[11px] ${clickable ? 'text-[#adc6ff]' : 'text-[#8c909f]'}`}>{clickable ? 'View all in Explorer →' : sub}</span>
                   </>
                 )
                 return clickable ? (
@@ -310,7 +310,7 @@ export default function ExecutiveOverview({
 
       {/* Data note */}
       <section aria-labelledby="ov-data" className="mb-24 max-w-[68ch] border-t border-white/[0.08] pt-8">
-        <h2 id="ov-data" className="mb-2 text-base font-semibold tracking-[-0.01em]">About this data</h2>
+        <h2 id="ov-data" className="mb-2 text-[16px] font-semibold tracking-[-0.01em] text-[#e2e2e2]">About this data</h2>
         <p className="m-0 text-[13px] leading-relaxed text-[#8c909f] [text-wrap:pretty]">
           Prices come from Yahoo Finance and are refreshed on weekdays after the US market closes{dataDate ? `. Latest prices: ${dataDate}` : ''}. Company fundamentals such as profit margin come from a static dataset and can lag. {' '}
           {filtered.length === companies.length

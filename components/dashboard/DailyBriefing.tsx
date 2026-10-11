@@ -219,7 +219,7 @@ export default function DailyBriefing({
         </div>
       </div>
 
-      <p className={`${MONO} mt-8 text-[10px] text-[#8c909f]`}>Educational model summary only · Not investment advice</p>
+      <p className={`${MONO} mt-8 text-[11px] text-[#8c909f]`}>Educational model summary only · Not investment advice</p>
     </section>
   )
 }
