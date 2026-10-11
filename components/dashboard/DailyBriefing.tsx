@@ -16,33 +16,24 @@ interface Props {
   onNavigateToWatchlist?: () => void
 }
 
-// Graphite Obsidian tokens — matches ExecutiveOverview
-const S = {
-  surface:        'rgba(32, 31, 38, 0.65)',
-  surfaceDim:     'rgba(20, 20, 26, 0.7)',
-  border:         'rgba(255,255,255,0.10)',
-  borderTop:      'rgba(255,255,255,0.20)',
-  divider:        'rgba(255,255,255,0.06)',
-  primary:        '#c6c0ff',
-  bronze:         '#CD7F32',
-  positive:       '#b0fbca',
-  negative:       '#ffb4ab',
-  outline:        '#928f9f',
-  textPrimary:    '#e5e1eb',
-  textSecondary:  '#c8c4d5',
-  textMuted:      '#928f9f',
+// Colours come from the Learn tab palette. A signal keeps one colour everywhere on the Overview.
+const C = {
+  positive: '#4edea3',
+  negative: '#F87171',
+  amber: '#F59E0B',
+  blue: '#adc6ff',
+  lilac: '#d0bcff',
+  grey: '#8c909f',
 }
 
-function panelLabel(text: string, color: string) {
-  return (
-    <span style={{
-      fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
-      color, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-      display: 'block', marginBottom: 20,
-    }}>
-      {text}
-    </span>
-  )
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#adc6ff]'
+const PRESS = 'transition-[transform,background-color,box-shadow,color] duration-200 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:transform-none'
+const HOVER_ROW = '[@media(hover:hover)]:hover:bg-white/[0.06] [@media(hover:hover)]:hover:ring-white/[0.16]'
+const MONO = "[font-family:'JetBrains_Mono',monospace]"
+const cssVar = (hex: string) => ({ '--c': hex } as React.CSSProperties)
+
+function PanelLabel({ children }: { children: React.ReactNode }) {
+  return <h3 className="mb-5 text-xs font-medium text-[#8c909f]">{children}</h3>
 }
 
 /** Parse YYYY-MM-DD without UTC shift */
@@ -130,150 +121,112 @@ export default function DailyBriefing({
   // Normalize sector bar widths
   const maxSectorUpside = Math.max(...briefing.topSectors.map(s => Math.abs(s.avg_forecast_30d_upside_pct)), 0.01)
 
-  const panelBorder: React.CSSProperties = { borderRight: `1px solid ${S.divider}`, borderBottom: `1px solid ${S.divider}` }
-  const panelStyle: React.CSSProperties = { padding: '24px 28px', background: S.surfaceDim }
+  const panel = 'bg-[#151718] px-7 py-6'
+  const outlineBtn = `rounded-full px-5 py-2 text-xs font-semibold text-[#adc6ff] ring-1 ring-inset ring-[#adc6ff]/70 [@media(hover:hover)]:hover:bg-[#adc6ff]/10 ${PRESS} ${FOCUS}`
 
   return (
-    <section style={{ marginBottom: 48 }}>
-
-      {/* Glass card wrapper */}
-      <div style={{
-        background: S.surface,
-        backdropFilter: 'blur(32px)',
-        WebkitBackdropFilter: 'blur(32px)',
-        border: `1px solid ${S.border}`,
-        borderTop: `1px solid ${S.borderTop}`,
-        borderLeft: `1px solid ${S.borderTop}`,
-        boxShadow: '0 40px 60px -15px rgba(0,0,0,0.5)',
-        borderRadius: 16,
-        overflow: 'hidden',
-      }}>
+    <section aria-labelledby="ov-briefing" className="mb-12">
+      <div className="overflow-hidden rounded-2xl bg-white/[0.025] ring-1 ring-inset ring-white/[0.08]">
 
         {/* Header strip */}
-        <div style={{
-          padding: '14px 28px', borderBottom: `1px solid ${S.border}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(255,255,255,0.02)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: S.positive, boxShadow: `0 0 8px ${S.positive}` }} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: S.textPrimary, letterSpacing: '-0.01em' }}>
-              Today's MarketPulse Briefing
-            </span>
+        <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-7 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <span aria-hidden className="size-2 rounded-full bg-[#4edea3]" />
+            <h2 id="ov-briefing" className="text-sm font-semibold tracking-[-0.01em] text-[#e2e2e2]">Today&apos;s MarketPulse Briefing</h2>
           </div>
-          <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: S.textMuted, letterSpacing: '0.05em' }}>
-            {fmtDate(briefing.marketDate)}
-          </span>
+          <span className={`${MONO} text-[11px] tabular-nums text-[#8c909f]`}>{fmtDate(briefing.marketDate)}</span>
         </div>
 
         {/* 2 × 2 panel grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: S.divider, gap: 1 }}>
+        <div className="grid grid-cols-2 gap-px bg-white/[0.06]">
 
-          {/* Panel 1 — Market Signal Summary */}
-          <div style={{ ...panelStyle }}>
-            {panelLabel('Market Signal Summary', S.outline)}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {/* Panel 1: signal summary */}
+          <div className={panel}>
+            <PanelLabel>Market signal summary</PanelLabel>
+            <div className="grid grid-cols-2 gap-2.5">
               {[
-                { count: briefing.opportunity, label: 'Opportunity', color: S.positive, sig: 'Potential Opportunity' },
-                { count: briefing.speculative,  label: 'High Vol',    color: S.bronze,   sig: 'High Volatility Speculative' },
-                { count: briefing.stable,       label: 'Stable',      color: S.primary,  sig: 'Stable Watchlist' },
-                { count: briefing.review,       label: 'Review',      color: S.outline,  sig: 'Needs Further Review' },
+                { count: briefing.opportunity, label: 'Opportunity', color: C.positive, sig: 'Potential Opportunity' },
+                { count: briefing.speculative, label: 'High vol',    color: C.amber,    sig: 'High Volatility Speculative' },
+                { count: briefing.stable,      label: 'Stable',      color: C.blue,     sig: 'Stable Watchlist' },
+                { count: briefing.review,      label: 'Review',      color: C.grey,     sig: 'Needs Further Review' },
               ].map(({ count, label, color, sig }) => (
-                <div key={label}
-                  onClick={() => onNavigateToExplorer?.(undefined, sig)}
-                  style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.07)`, borderRadius: 10, cursor: 'pointer', transition: 'border-color 0.15s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}40` }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)' }}>
-                  <div style={{ fontSize: 30, fontWeight: 700, color, lineHeight: 1, letterSpacing: '-0.02em' }}>{count}</div>
-                  <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: S.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 4 }}>{label}</div>
-                </div>
+                <button key={label} type="button" style={cssVar(color)} onClick={() => onNavigateToExplorer?.(undefined, sig)}
+                  aria-label={`${count} companies, ${label}. Open in Explorer`}
+                  className={`rounded-lg bg-white/[0.035] px-4 py-3.5 text-left ring-1 ring-inset ring-white/[0.07] ${HOVER_ROW} ${PRESS} ${FOCUS}`}>
+                  <div className="text-3xl font-semibold leading-none tracking-[-0.02em] tabular-nums text-[color:var(--c)]">{count}</div>
+                  <div className="mt-1.5 text-[11px] text-[#8c909f]">{label}</div>
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Panel 2 — Top Alerts */}
-          <div style={{ ...panelStyle }}>
-            {panelLabel('Top Alerts', S.outline)}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-              {/* Top upside */}
+          {/* Panel 2: top alerts */}
+          <div className={panel}>
+            <PanelLabel>Top alerts</PanelLabel>
+            <div className="flex flex-col gap-2.5">
               {briefing.topOpportunity ? (
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', background: `${S.positive}0f`, border: `1px solid ${S.positive}25`, borderRadius: 10,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <TrendingUp size={14} style={{ color: S.positive }} />
+                <div style={cssVar(C.positive)} className="flex items-center justify-between rounded-lg bg-[color:color-mix(in_srgb,var(--c)_6%,transparent)] px-4 py-3 ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_18%,transparent)]">
+                  <div className="flex items-center gap-2.5">
+                    <TrendingUp size={14} strokeWidth={1.5} className="text-[color:var(--c)]" aria-hidden />
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: S.positive, fontFamily: 'JetBrains Mono, monospace' }}>
-                        {briefing.topOpportunity.symbol}
-                      </div>
-                      <div style={{ fontSize: 11, color: S.textMuted }}>Predictive Opportunity</div>
+                      <div className={`${MONO} text-[15px] font-bold text-[color:var(--c)]`}>{briefing.topOpportunity.symbol}</div>
+                      <div className="text-[11px] text-[#8c909f]">Predictive Opportunity</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: S.positive, fontFamily: 'JetBrains Mono, monospace' }}>
-                      {formatPercent(briefing.topOpportunity.forecast_30d_upside_pct, 1)}
-                    </div>
-                    <div style={{ fontSize: 10, color: S.textMuted }}>Forecast Upside</div>
+                  <div className="text-right">
+                    <div className={`${MONO} text-[16px] font-bold tabular-nums text-[color:var(--c)]`}>{formatPercent(briefing.topOpportunity.forecast_30d_upside_pct, 1)}</div>
+                    <div className="text-[10px] text-[#8c909f]">Forecast Upside</div>
                   </div>
                 </div>
               ) : null}
 
-              {/* Highest volatility */}
               {briefing.highestVol ? (
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', background: `${S.negative}0f`, border: `1px solid ${S.negative}25`, borderRadius: 10,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <AlertTriangle size={14} style={{ color: S.negative }} />
+                <div style={cssVar(C.negative)} className="flex items-center justify-between rounded-lg bg-[color:color-mix(in_srgb,var(--c)_6%,transparent)] px-4 py-3 ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_18%,transparent)]">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle size={14} strokeWidth={1.5} className="text-[color:var(--c)]" aria-hidden />
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: S.negative, fontFamily: 'JetBrains Mono, monospace' }}>
-                        {briefing.highestVol.symbol}
-                      </div>
-                      <div style={{ fontSize: 11, color: S.textMuted }}>Volatility Peak</div>
+                      <div className={`${MONO} text-[15px] font-bold text-[color:var(--c)]`}>{briefing.highestVol.symbol}</div>
+                      <div className="text-[11px] text-[#8c909f]">Volatility Peak</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: S.negative, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <div className="text-right">
+                    <div className={`${MONO} text-[16px] font-bold tabular-nums text-[color:var(--c)]`}>
                       {Number.isFinite(briefing.highestVol.annualized_volatility_pct)
                         ? `${briefing.highestVol.annualized_volatility_pct.toFixed(1)}%`
                         : 'n/a'}
                     </div>
-                    <div style={{ fontSize: 10, color: S.textMuted }}>Risk Index</div>
+                    <div className="text-[10px] text-[#8c909f]">Risk Index</div>
                   </div>
                 </div>
               ) : null}
             </div>
           </div>
 
-          {/* Panel 3 — Sector Tracker */}
-          <div style={{ ...panelStyle }}>
-            {panelLabel('Sector Tracker', S.outline)}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Panel 3: sector tracker */}
+          <div className={panel}>
+            <PanelLabel>Sector tracker</PanelLabel>
+            <div className="flex flex-col gap-3.5">
               {briefing.topSectors.length > 0 ? briefing.topSectors.map((s, i) => {
                 const upside = s.avg_forecast_30d_upside_pct
                 const barPct = Math.min(100, Math.abs(upside) / maxSectorUpside * 100)
-                const barColors = [S.primary, S.bronze, S.outline]
-                const color = barColors[i] ?? S.outline
+                const color = [C.blue, C.amber, C.grey][i] ?? C.grey
                 return (
-                  <div key={s.sector}
-                    onClick={() => onNavigateToExplorer?.(s.sector, undefined)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
-                    <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 9999, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${barPct}%`, background: color, borderRadius: 9999, transition: 'width 0.6s ease' }} />
-                    </div>
-                    <span style={{ fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: S.textSecondary, width: 120, flexShrink: 0, textAlign: 'right' }}>
+                  <button key={s.sector} type="button" style={cssVar(color)} onClick={() => onNavigateToExplorer?.(s.sector, undefined)}
+                    aria-label={`${s.sector}, ${upside >= 0 ? '+' : ''}${upside.toFixed(1)} percent average forecast upside. Open in Explorer`}
+                    className={`flex items-center gap-3.5 rounded-md py-1 text-left [@media(hover:hover)]:hover:bg-white/[0.04] ${PRESS} ${FOCUS}`}>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                      <span className="block h-full rounded-full bg-[color:var(--c)] transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${barPct}%` }} />
+                    </span>
+                    <span className={`${MONO} w-[120px] shrink-0 text-right text-xs text-[#c2c6d6]`}>
                       {s.sector.slice(0, 10)}{' '}
-                      <span style={{ color: upside >= 0 ? S.positive : S.negative, fontWeight: 600 }}>
+                      <span className={`font-semibold tabular-nums ${upside >= 0 ? 'text-[#4edea3]' : 'text-[#F87171]'}`}>
                         {upside >= 0 ? '+' : ''}{upside.toFixed(1)}%
                       </span>
                     </span>
-                  </div>
+                  </button>
                 )
               }) : (
-                <p style={{ fontSize: 12, color: S.textMuted, margin: 0 }}>
+                <p className="m-0 text-xs text-[#8c909f]">
                   {briefing.totalSnapshots > 0
                     ? `Signal tracking: ${briefing.totalSnapshots} signals stored. ${briefing.pendingSnaps > 0 ? `${briefing.pendingSnaps} pending outcomes.` : 'All outcomes complete.'}`
                     : 'No sector data available.'}
@@ -283,55 +236,39 @@ export default function DailyBriefing({
           </div>
 
           {/* Panel 4: saved list */}
-          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div className={`${panel} flex flex-col items-center justify-center text-center`}>
             {briefing.watchlistNote ? (
               <>
-                {panelLabel(LIST_NAME, S.outline)}
-                <Bookmark size={28} style={{ color: S.primary, marginBottom: 12 }} />
-                <div style={{ fontSize: 28, fontWeight: 700, color: S.primary, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 6 }}>
-                  {briefing.watchlistNote.count}
-                </div>
-                <p style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.5, marginBottom: 16 }}>
+                <PanelLabel>{LIST_NAME}</PanelLabel>
+                <Bookmark size={26} strokeWidth={1.5} className="mb-3 text-[#adc6ff]" aria-hidden />
+                <div className="mb-1.5 text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums text-[#adc6ff]">{briefing.watchlistNote.count}</div>
+                <p className="mb-4 text-[13px] leading-normal text-[#c2c6d6]">
                   {briefing.watchlistNote.count === 1 ? 'stock' : 'stocks'} tracked
                   {briefing.watchlistNote.avgUpside !== null && (
-                    <> · avg <span style={{ color: briefing.watchlistNote.avgUpside >= 0 ? S.positive : S.negative, fontWeight: 600 }}>
+                    <> · avg <span className={`font-semibold tabular-nums ${briefing.watchlistNote.avgUpside >= 0 ? 'text-[#4edea3]' : 'text-[#F87171]'}`}>
                       {formatPercent(briefing.watchlistNote.avgUpside, 1)}
                     </span> 30D upside</>
                   )}
                   {briefing.watchlistNote.leaderSymbol && (
-                    <>, led by <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: S.textPrimary }}>{briefing.watchlistNote.leaderSymbol}</span></>
+                    <>, led by <span className={`${MONO} font-bold text-[#e2e2e2]`}>{briefing.watchlistNote.leaderSymbol}</span></>
                   )}
                 </p>
-                <button onClick={onNavigateToWatchlist}
-                  style={{ border: `1px solid ${S.primary}`, background: 'none', color: S.primary, padding: '8px 20px', borderRadius: 9999, fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', fontFamily: 'Inter, sans-serif', transition: 'background 0.15s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${S.primary}18` }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
-                  View {LIST_NAME} →
-                </button>
+                <button type="button" onClick={onNavigateToWatchlist} className={outlineBtn}>View {LIST_NAME} →</button>
               </>
             ) : (
               <>
-                <BookmarkPlus size={36} style={{ color: S.primary, marginBottom: 14, opacity: 0.8 }} />
-                <h3 style={{ fontSize: 17, fontWeight: 600, color: S.textPrimary, letterSpacing: '-0.01em', marginBottom: 8 }}>Build {LIST_NAME === 'Portfolio' ? 'a Portfolio' : 'Watchlist'}</h3>
-                <p style={{ fontSize: 13, color: S.textMuted, lineHeight: 1.5, maxWidth: 200, marginBottom: 20 }}>
-                  Monitor specific tickers with personalised briefing summaries.
-                </p>
-                <button onClick={onNavigateToWatchlist}
-                  style={{ border: `1px solid ${S.primary}`, background: 'none', color: S.primary, padding: '8px 20px', borderRadius: 9999, fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', fontFamily: 'Inter, sans-serif', transition: 'background 0.15s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${S.primary}18` }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
-                  Configure Symbols
-                </button>
+                <BookmarkPlus size={32} strokeWidth={1.5} className="mb-3.5 text-[#adc6ff]/80" aria-hidden />
+                <h3 className="mb-2 text-[17px] font-semibold tracking-[-0.01em] text-[#e2e2e2]">Build {LIST_NAME === 'Portfolio' ? 'a Portfolio' : 'Watchlist'}</h3>
+                <p className="mb-5 max-w-[200px] text-[13px] leading-normal text-[#8c909f]">Monitor specific tickers with personalised briefing summaries.</p>
+                <button type="button" onClick={onNavigateToWatchlist} className={outlineBtn}>Configure Symbols</button>
               </>
             )}
           </div>
         </div>
 
         {/* Footer disclaimer */}
-        <div style={{ padding: '9px 28px', borderTop: `1px solid ${S.border}`, background: 'rgba(255,255,255,0.02)' }}>
-          <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: S.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Educational model summary only · Not investment advice
-          </span>
+        <div className="border-t border-white/[0.08] bg-white/[0.02] px-7 py-2.5">
+          <span className={`${MONO} text-[10px] text-[#8c909f]`}>Educational model summary only · Not investment advice</span>
         </div>
       </div>
     </section>
