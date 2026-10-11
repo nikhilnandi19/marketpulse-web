@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   ChevronDown, ChevronRight, BookOpen, TrendingUp, AlertTriangle,
   BarChart2, GitBranch, Percent, Shield, Zap, Search, ExternalLink,
-  Youtube, FileText, Activity, Sparkles, ArrowRight
+  Youtube, FileText, Activity, Sparkles, ArrowRight, Gauge, Ruler, Scale, X, ArrowUpRight
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -652,518 +652,423 @@ function searchConcepts(query: string) {
   })
 }
 
-// ─── Stitch colour palette ────────────────────────────────────────────────────
+// ─── Redesign notes (taste-skill: redesign-skill) ─────────────────────────────
+// Audit of the original: centred, symmetric hero; four equal category cards; an accordion
+// list; Inter everywhere; uppercase mono labels and pill badges; a bordered card around
+// everything; a spinner-free but empty "no results" state; 100vh. This rebuild works in the
+// existing stack (Tailwind), keeps the tab's colours, and changes, in priority order:
+// font, surfaces, hover/press states, layout and spacing, components (accordion becomes a
+// list with a side panel), states, then type polish. Glass is used on the few surfaces that
+// need elevation: search, the AI panel, topic tiles and the detail panel.
 
-const D = {
-  bg:        '#121414',
-  surface:   '#1a1c1c',
-  container: '#1e2020',
-  lowest:    '#0c0f0f',
-  border:    'rgba(66,71,84,0.3)',
-  text:      '#e2e2e2',
-  textSec:   '#c2c6d6',
-  textMuted: '#8c909f',
-  primary:   '#adc6ff',
-  secondary: '#d0bcff',
-  tertiary:  '#4edea3',
-  mono:      'JetBrains Mono, monospace',
-  body:      'Inter, system-ui, sans-serif',
-}
-
-// ─── Category cards config (mirrors Stitch bento grid) ────────────────────────
+const TERMS_TRY = ['Volatility', 'MAPE', 'Value at Risk', 'Drawdown', 'Moving average']
+const ADVANCED_TAGS = ['Model', 'Error Metric', 'Methodology', 'Signal', 'Portfolio', 'Method']
 
 const CONCEPT_COUNT = (id: string) => {
   const n = SECTIONS.find(sec => sec.id === id)?.concepts.length ?? 0
-  return `${n} ${n === 1 ? 'Concept' : 'Concepts'}`
+  return `${n} ${n === 1 ? 'concept' : 'concepts'}`
 }
 
-const CATEGORY_CARDS = [
-  { id: 'basics',       label: 'Basics',        sub: 'Stocks, indices, tickers, sectors.',   count: CONCEPT_COUNT('basics'),       icon: '⬡',  color: '#adc6ff' },
-  { id: 'risk',         label: 'Risk',          sub: 'Volatility and risk levels.',          count: CONCEPT_COUNT('risk'),         icon: '△',  color: '#F59E0B' },
-  { id: 'forecast',     label: 'Models',        sub: 'Naive, momentum and trend models.',    count: CONCEPT_COUNT('forecast'),     icon: '⬖',  color: '#d0bcff' },
-  { id: 'errors',       label: 'Metrics',       sub: 'MAE, RMSE and MAPE.',                  count: CONCEPT_COUNT('errors'),       icon: '▦',  color: '#60A5FA' },
-  { id: 'price',        label: 'Returns',       sub: 'Price and return metrics.',            count: CONCEPT_COUNT('price'),        icon: '⬡',  color: '#34D399' },
-  { id: 'fundamentals', label: 'Fundamentals',  sub: 'Margins, revenue and income.',         count: CONCEPT_COUNT('fundamentals'), icon: '∿',  color: '#A78BFA' },
-  { id: 'limitations',  label: 'Limits',        sub: 'What the models cannot do.',           count: CONCEPT_COUNT('limitations'),  icon: '◎',  color: '#F87171' },
-  { id: 'signals',      label: 'Signals',       sub: 'Dashboard labels explained.',          count: CONCEPT_COUNT('signals'),      icon: '◫',  color: '#adc6ff', highlighted: true },
-  { id: 'portfolio',    label: 'Portfolio risk', sub: 'How the Portfolio page measures risk: VaR, drawdown, stress tests and their limits.', count: CONCEPT_COUNT('portfolio'), icon: '◈', color: '#c6c0ff', wide: true },
+// Tile spans are written out in full so Tailwind can see them. Rows add up to 12 columns each:
+// basics (6, two rows tall) + risk 3 + models 3 / metrics 6 / returns 3 + fundamentals 3 + portfolio 6 / signals 7 + limits 5.
+const TOPICS = [
+  { id: 'basics',       label: 'Basics',         sub: 'Stocks, indices, tickers and sectors. Start here if the terms are new.', color: '#adc6ff', Icon: BookOpen,   span: 'sm:col-span-2 lg:col-span-6 lg:row-span-2', terms: 4, rich: true },
+  { id: 'risk',         label: 'Risk',           sub: 'Volatility and risk levels.',          color: '#F59E0B', Icon: Gauge,      span: 'lg:col-span-3', terms: 0 },
+  { id: 'forecast',     label: 'Models',         sub: 'Naive, momentum and trend models.',    color: '#d0bcff', Icon: GitBranch,  span: 'lg:col-span-3', terms: 0 },
+  { id: 'errors',       label: 'Metrics',        sub: 'How forecast error is measured: MAE, RMSE and MAPE.', color: '#60A5FA', Icon: Ruler, span: 'sm:col-span-2 lg:col-span-6', terms: 3 },
+  { id: 'price',        label: 'Returns',        sub: 'Price and return metrics.',            color: '#34D399', Icon: TrendingUp, span: 'lg:col-span-3', terms: 0 },
+  { id: 'fundamentals', label: 'Fundamentals',   sub: 'Margins, revenue and income.',         color: '#A78BFA', Icon: Percent,    span: 'lg:col-span-3', terms: 0 },
+  { id: 'portfolio',    label: 'Portfolio risk', sub: 'How the Portfolio page measures risk, from VaR to stress tests, and where those numbers stop being reliable.', color: '#c6c0ff', Icon: Activity, span: 'sm:col-span-2 lg:col-span-6', terms: 4 },
+  { id: 'signals',      label: 'Signals',        sub: 'What each dashboard label means and what it does not.', color: '#adc6ff', Icon: Zap, span: 'sm:col-span-2 lg:col-span-7', terms: 3 },
+  { id: 'limitations',  label: 'Limits',         sub: 'What the models cannot do.',           color: '#F87171', Icon: Scale,      span: 'lg:col-span-5', terms: 0 },
 ]
+
+// Glass: blur, a 1px inner ring and a lit top edge for the refraction, a shadow tinted to the page colour.
+const GLASS =
+  'bg-white/[0.04] backdrop-blur-xl ring-1 ring-inset ring-white/[0.08] ' +
+  'shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_22px_44px_-28px_rgba(4,8,9,0.95)] ' +
+  '[@media(prefers-reduced-transparency:reduce)]:bg-[#1e2020] [@media(prefers-reduced-transparency:reduce)]:backdrop-blur-none'
+
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#adc6ff]'
+const PRESS = 'transition-[transform,background-color,box-shadow,opacity,color] duration-200 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:transform-none'
+const MONO = "[font-family:'JetBrains_Mono',monospace]"
+const GRAIN =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")"
+const KEYFRAMES =
+  '@keyframes lt-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}' +
+  '@keyframes lt-fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}'
+
+type ConceptItem = typeof ALL_CONCEPTS[number]
+type Group = { id: string; title: string; color: string; items: ConceptItem[] }
+
+const keyOf = (c: ConceptItem) => `${c.section.id}:${c.term}`
+const colorVar = (hex: string) => ({ '--c': hex } as React.CSSProperties)
+const stagger = (i: number) => ({ '--i': i } as React.CSSProperties)
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function LearnTab({ onAskAI }: { onAskAI?: (q: string) => void }) {
   const [query, setQuery] = useState('')
   const [openSection, setOpenSection] = useState('')
-  const [openConcept, setOpenConcept] = useState<string | null>(null)
-  const [deepDiveFilter, setDeepDiveFilter] = useState<'all' | 'advanced'>('all')
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [level, setLevel] = useState<'all' | 'advanced'>('all')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const conceptsRef = useRef<HTMLDivElement>(null)
 
   const searchResults = useMemo(() => searchConcepts(query), [query])
   const isSearching = query.trim().length > 0
-
   const activeSection = openSection ? SECTIONS.find(s => s.id === openSection) ?? null : null
 
-  // All concepts for deep dive list (filtered by section tile + advanced toggle)
-  const deepDiveConcepts = useMemo(() => {
-    let concepts = ALL_CONCEPTS
-    if (openSection) {
-      concepts = concepts.filter(c => c.section.id === openSection)
+  // "/" jumps to search unless you are already typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      e.preventDefault()
+      searchRef.current?.focus()
     }
-    if (deepDiveFilter === 'advanced') {
-      concepts = concepts.filter(c => ['Model', 'Error Metric', 'Methodology', 'Signal'].includes(c.tag))
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const groups: Group[] = useMemo(() => {
+    const pick = (c: ConceptItem) => (level === 'advanced' ? ADVANCED_TAGS.includes(c.tag) : true)
+    return SECTIONS
+      .filter(s => !openSection || s.id === openSection)
+      .map(s => ({ id: s.id, title: s.title, color: s.color, items: ALL_CONCEPTS.filter(c => c.section.id === s.id && pick(c)) }))
+      .filter(g => g.items.length > 0)
+  }, [level, openSection])
+  const shown = groups.reduce((n, g) => n + g.items.length, 0)
+
+  const searchGroups: Group[] = useMemo(
+    () => (searchResults.length ? [{ id: 'results', title: 'Results', color: '#adc6ff', items: searchResults }] : []),
+    [searchResults],
+  )
+
+  const chooseSection = (id: string) => {
+    const next = openSection === id ? '' : id
+    setOpenSection(next)
+    setSelectedKey(null)
+    if (next) {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      requestAnimationFrame(() => conceptsRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }))
     }
-    return concepts
-  }, [deepDiveFilter, openSection])
+  }
 
   return (
-    <div style={{ fontFamily: D.body, background: D.bg, minHeight: '100vh', width: '100%' }}>
-      
-      {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '64px 64px 48px', maxWidth: 1440, margin: '0 auto' }}>
-        
-        {/* Pill badge */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '4px 16px',
-            background: D.container,
-            border: `1px solid ${D.border}`,
-            borderRadius: 999,
-          }}>
-            <span style={{ fontFamily: D.mono, fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: D.textMuted }}>
-              Market Education Hub
-            </span>
-          </div>
-        </div>
+    <div className="relative isolate min-h-dvh w-full overflow-hidden bg-[#121414] font-sans text-[#e2e2e2] antialiased">
+      <style>{KEYFRAMES}</style>
 
-        {/* Headline */}
-        <h1 style={{
-          textAlign: 'center', margin: '0 0 16px',
-          fontSize: 'clamp(2.5rem,6vw,4rem)',
-          fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1.1,
-          color: D.text,
-        }}>
-          Learn{' '}
-          <span style={{
-            background: 'linear-gradient(135deg, #d0bcff 0%, #4edea3 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>
-            MarketPulse
-          </span>
-        </h1>
-
-        <p style={{
-          textAlign: 'center', color: D.textMuted,
-          fontSize: 16, lineHeight: 1.65, maxWidth: 560, margin: '0 auto 40px',
-        }}>
-          Every concept used in this dashboard explained in plain English. No jargon, just clear explanations.
-        </p>
-
-        {/* Search bar */}
-        <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: D.textMuted, pointerEvents: 'none' }} />
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Find financial terms, metrics, or models..."
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: '14px 16px 14px 44px',
-              background: D.lowest,
-              border: `1px solid ${query ? D.primary : D.border}`,
-              borderRadius: 12,
-              color: D.text, fontSize: 15,
-              fontFamily: D.body, outline: 'none',
-              transition: 'border-color 0.2s',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-            }}
-          />
-          {query && (
-            <button onClick={() => setQuery('')} style={{
-              position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: D.textMuted, fontSize: 18, lineHeight: 1,
-            }}>×</button>
-          )}
-        </div>
-
-        {/* Search results */}
-        {isSearching && (
-          <div style={{ maxWidth: 720, margin: '12px auto 0' }}>
-            {searchResults.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: D.textMuted, fontSize: 13, fontFamily: D.mono }}>
-                No results for "{query}". Try a synonym or related term.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, marginBottom: 8, letterSpacing: '0.08em' }}>
-                  {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-                </div>
-                {searchResults.map(c => (
-                  <div key={`${c.section.id}-${c.term}`}
-                    style={{
-                      background: D.surface,
-                      border: `1px solid ${D.border}`,
-                      borderRadius: 8, overflow: 'hidden',
-                    }}>
-                    <ConceptRow
-                      concept={c}
-                      section={c.section}
-                      isOpen={openConcept === `search-${c.term}`}
-                      onToggle={() => setOpenConcept(openConcept === `search-${c.term}` ? null : `search-${c.term}`)}
-                      onAskAI={onAskAI}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      {/* Depth for the glass: a faint line grid that fades out, plus grain. Both are static and ignore the pointer. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-x-0 top-0 h-[720px] bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(60%_80%_at_28%_0%,#000,transparent)]"
+        />
+        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: GRAIN, backgroundSize: '160px 160px' }} />
       </div>
 
-      {/* ── Bento grid + AI card ────────────────────────────────────────────── */}
-      {!isSearching && (
-        <div style={{ padding: '0 64px 48px', maxWidth: 1440, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, alignItems: 'start' }}>
+      <div className="mx-auto w-full max-w-[1320px] px-5 sm:px-8 lg:px-14">
+        {/* ── Header: left-aligned, with the AI panel offset down the page ── */}
+        <header className="grid gap-x-14 gap-y-12 pb-20 pt-16 sm:pt-20 lg:grid-cols-12 lg:pb-28 lg:pt-28">
+          <div className="lg:col-span-7">
+            <p className="animate-[lt-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] text-sm text-[#8c909f] motion-reduce:animate-none">Market education hub</p>
+            <h1 className="mt-5 animate-[lt-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] [animation-delay:60ms] [text-wrap:balance] motion-reduce:animate-none">
+              Learn{' '}
+              <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text pb-1 text-transparent">MarketPulse</span>
+            </h1>
+            <p className="mt-6 max-w-[48ch] animate-[lt-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty] motion-reduce:animate-none">
+              Every concept used in this dashboard explained in plain English. No jargon, just clear explanations.
+            </p>
 
-            {/* Ask AI card */}
-            <div style={{
-              background: '#111113', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 12, padding: 24,
-              display: 'flex', flexDirection: 'column', gap: 20,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(208,188,255,0.15)', border: '1px solid rgba(208,188,255,0.2)',
-                }}>
-                  <Sparkles size={18} style={{ color: '#d0bcff' }} />
-                </div>
-                <h2 style={{ fontSize: 18, fontWeight: 600, color: D.text, margin: 0 }}>Ask MarketPulse AI</h2>
-              </div>
-              <p style={{ fontSize: 14, color: D.textMuted, margin: 0, lineHeight: 1.6 }}>
-                Query our technical methodology using natural language for instant deep-dives.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  'Explain MAPE',
-                  'What does Adaptive Momentum mean?',
-                  'How is Risk Matrix weighted?',
-                ].map(q => (
-                  <button key={q} onClick={() => onAskAI?.(q)}
-                    style={{
-                      width: '100%', textAlign: 'left',
-                      padding: '10px 14px',
-                      background: D.container, border: `1px solid ${D.border}`,
-                      borderRadius: 6, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      color: D.textSec, fontSize: 12, fontFamily: D.mono,
-                      transition: 'border-color 0.15s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = D.primary}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = D.border}>
-                    <span>{q}</span>
-                    <ArrowRight size={12} style={{ color: D.textMuted }} />
+            <div className="mt-10 max-w-[560px] animate-[lt-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] [animation-delay:180ms] motion-reduce:animate-none">
+              <label className={`relative flex h-14 items-center gap-3 rounded-xl px-4 transition-shadow duration-200 focus-within:ring-[#adc6ff]/60 ${GLASS}`}>
+                <Search size={18} strokeWidth={1.5} className="shrink-0 text-[#8c909f]" aria-hidden />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setSelectedKey(null) }}
+                  placeholder="Find a term, metric or model"
+                  aria-label="Search concepts"
+                  className="h-full min-w-0 flex-1 bg-transparent text-base text-[#e2e2e2] outline-none placeholder:text-[#8c909f]"
+                />
+                {query ? (
+                  <button onClick={() => { setQuery(''); searchRef.current?.focus() }} aria-label="Clear search"
+                    className={`grid size-9 [@media(pointer:coarse)]:size-11 place-items-center rounded-md text-[#c2c6d6] hover:bg-white/10 ${PRESS} ${FOCUS}`}>
+                    <X size={16} strokeWidth={1.5} aria-hidden />
                   </button>
+                ) : (
+                  <kbd className={`${MONO} hidden rounded-[4px] border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-[#8c909f] sm:block`}>/</kbd>
+                )}
+              </label>
+              <p className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-[#8c909f]">
+                <span className="mr-1">Try</span>
+                {TERMS_TRY.map((t, i) => (
+                  <span key={t}>
+                    <button onClick={() => setQuery(t)}
+                      className={`rounded-sm px-1 py-1.5 [@media(pointer:coarse)]:min-h-11 text-[#c2c6d6] underline decoration-white/20 underline-offset-4 [@media(hover:hover)]:hover:text-white [@media(hover:hover)]:hover:decoration-white/60 ${PRESS} ${FOCUS}`}>{t}</button>
+                    {i < TERMS_TRY.length - 1 && <span aria-hidden className="text-white/20">,</span>}
+                  </span>
                 ))}
-              </div>
+              </p>
             </div>
+          </div>
 
-            {/* Category grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              {CATEGORY_CARDS.map(card => {
-                const isActive = openSection === card.id
-                const idleBg = card.highlighted ? 'rgba(173,198,255,0.05)' : '#111113'
-                const idleBorder = card.highlighted ? 'rgba(173,198,255,0.2)' : 'rgba(255,255,255,0.08)'
+          <aside aria-label="Ask MarketPulse AI"
+            className={`animate-[lt-rise_0.6s_cubic-bezier(0.16,1,0.3,1)_backwards] self-start rounded-2xl p-6 [animation-delay:240ms] motion-reduce:animate-none sm:p-7 lg:col-span-5 lg:mt-24 ${GLASS}`}>
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 place-items-center rounded-lg bg-[#d0bcff]/10 text-[#d0bcff] ring-1 ring-inset ring-[#d0bcff]/20">
+                <Sparkles size={17} strokeWidth={1.5} aria-hidden />
+              </span>
+              <h2 className="text-lg font-medium tracking-[-0.01em]">Ask MarketPulse AI</h2>
+            </div>
+            <p className="mt-4 max-w-[44ch] text-sm leading-relaxed text-[#8c909f]">
+              Pick a question, or ask your own on the AI tab. Answers are built from this dashboard&apos;s own data and definitions.
+            </p>
+            <ul className="mt-5 divide-y divide-white/[0.07] border-y border-white/[0.07]">
+              {['Explain MAPE', 'What does Adaptive Momentum mean?', 'How is Risk Matrix weighted?'].map(q => (
+                <li key={q}>
+                  <button onClick={() => onAskAI?.(q)}
+                    className={`group flex min-h-12 w-full items-center justify-between gap-4 py-3 text-left text-sm text-[#c2c6d6] [@media(hover:hover)]:hover:text-white ${PRESS} ${FOCUS}`}>
+                    <span>{q}</span>
+                    <ArrowRight size={15} strokeWidth={1.5} aria-hidden
+                      className="shrink-0 text-[#8c909f] transition-transform duration-200 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        </header>
+
+        {/* ── Search results ── */}
+        {isSearching && (
+          <section aria-live="polite" className="pb-24">
+            <div className="mb-6 flex items-baseline justify-between gap-4">
+              <h2 className="text-2xl font-semibold tracking-[-0.03em]">
+                {searchResults.length === 0 ? 'No results' : `${searchResults.length} ${searchResults.length === 1 ? 'result' : 'results'}`}{' '}
+                <span className="font-normal text-[#8c909f]">for &ldquo;{query.trim()}&rdquo;</span>
+              </h2>
+            </div>
+            {searchResults.length === 0 ? (
+              <div className="max-w-[520px] border-t border-white/[0.07] pt-8">
+                <p className="text-lg font-medium">Nothing matches that yet.</p>
+                <p className="mt-2 text-sm leading-relaxed text-[#8c909f]">Try a synonym or a shorter word. These are common starting points:</p>
+                <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {TERMS_TRY.map(t => (
+                    <button key={t} onClick={() => setQuery(t)}
+                      className={`rounded-sm py-1.5 [@media(pointer:coarse)]:min-h-11 text-[#c2c6d6] underline decoration-white/20 underline-offset-4 [@media(hover:hover)]:hover:text-white ${PRESS} ${FOCUS}`}>{t}</button>
+                  ))}
+                </p>
+              </div>
+            ) : (
+              <ConceptBrowser groups={searchGroups} selectedKey={selectedKey} onSelect={setSelectedKey} onAskAI={onAskAI} showGroupTitles={false} />
+            )}
+          </section>
+        )}
+
+        {/* ── Topics ── */}
+        {!isSearching && (
+          <section aria-labelledby="lt-topics" className="pb-24 lg:pb-32">
+            <h2 id="lt-topics" className="text-2xl font-semibold tracking-[-0.03em]">Browse by topic</h2>
+            <p className="mt-2 text-sm text-[#8c909f]">Pick a topic to filter the concepts below.</p>
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:auto-rows-[minmax(168px,auto)] lg:grid-cols-12">
+              {TOPICS.map((t, i) => {
+                const sec = SECTIONS.find(s => s.id === t.id)
+                const pressed = openSection === t.id
                 return (
-                  <button key={card.id}
-                    onClick={() => setOpenSection(openSection === card.id ? '' : card.id)}
-                    style={{
-                      gridColumn: card.wide ? '1 / -1' : undefined,
-                      textAlign: 'left', padding: 20,
-                      background: isActive ? `${card.color}15` : idleBg,
-                      border: `1px solid ${isActive ? card.color : idleBorder}`,
-                      borderRadius: 12, cursor: 'pointer',
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                      transition: 'all 0.2s ease',
-                      opacity: openSection && !isActive ? 0.55 : 1,
-                    }}
-                    onMouseEnter={e => {
-                      if (isActive) return
-                      const el = e.currentTarget as HTMLElement
-                      el.style.borderColor = `${card.color}60`
-                      el.style.background = `${card.color}08`
-                      el.style.opacity = '1'
-                    }}
-                    onMouseLeave={e => {
-                      if (isActive) return
-                      const el = e.currentTarget as HTMLElement
-                      el.style.borderColor = idleBorder
-                      el.style.background = idleBg
-                      el.style.opacity = openSection ? '0.55' : '1'
-                    }}>
-                    <span style={{ fontSize: 20, color: card.color }}>{card.icon}</span>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: isActive ? card.color : D.text }}>{card.label}</div>
-                    <div style={{ fontSize: 12, color: D.textMuted, lineHeight: 1.5 }}>{card.sub}</div>
-                    <div style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, marginTop: 4 }}>{card.count}</div>
+                  <button key={t.id} aria-pressed={pressed} onClick={() => chooseSection(t.id)} style={{ ...colorVar(t.color), ...stagger(i) }}
+                    className={`group relative flex min-h-[168px] animate-[lt-rise_0.55s_cubic-bezier(0.16,1,0.3,1)_backwards] flex-col rounded-2xl p-5 text-left [animation-delay:calc(var(--i)*60ms)] motion-reduce:animate-none sm:p-6
+                      ${t.span} ${GLASS} ${PRESS} ${FOCUS}
+                      [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:bg-white/[0.065]
+                      aria-pressed:bg-white/[0.07] aria-pressed:ring-[color:color-mix(in_srgb,var(--c)_55%,transparent)]
+                      motion-reduce:hover:transform-none`}>
+                    <span className="grid size-9 place-items-center rounded-lg bg-[color:color-mix(in_srgb,var(--c)_12%,transparent)] text-[color:var(--c)] ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_22%,transparent)]">
+                      <t.Icon size={17} strokeWidth={1.5} aria-hidden />
+                    </span>
+                    <span className="mt-5 text-lg font-medium tracking-[-0.015em]">{t.label}</span>
+                    <span className="mt-1.5 max-w-[40ch] text-sm leading-relaxed text-[#8c909f] [text-wrap:pretty]">{t.sub}</span>
+                    {t.terms > 0 && sec && !('rich' in t && t.rich) && (
+                      <span className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-[#c2c6d6]/80">
+                        {sec.concepts.slice(0, t.terms).map(c => <span key={c.term}>{c.term}</span>)}
+                      </span>
+                    )}
+                    {t.terms > 0 && sec && 'rich' in t && t.rich && (
+                      <span className="mt-6 block divide-y divide-white/[0.07] border-y border-white/[0.07]">
+                        {sec.concepts.slice(0, t.terms).map(c => (
+                          <span key={c.term} className="flex items-baseline justify-between gap-6 py-2.5 text-[13px]">
+                            <span className="shrink-0 font-medium text-[#e2e2e2]">{c.term}</span>
+                            <span className="truncate text-right text-[#8c909f]">{c.plain}</span>
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                    <span className={`${MONO} mt-auto pt-5 text-[11px] tabular-nums text-[#8c909f]`}>{CONCEPT_COUNT(t.id)}</span>
                   </button>
                 )
               })}
             </div>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
 
-      {/* ── Deep Dive section ──────────────────────────────────────────────── */}
-      {!isSearching && (
-        <div style={{
-          padding: '0 64px 64px', maxWidth: 1440, margin: '0 auto',
-          borderTop: `1px solid rgba(66,71,84,0.2)`,
-          paddingTop: 48,
-        }}>
-
-          {/* Section header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: activeSection ? 16 : 28, flexWrap: 'wrap', gap: 12 }}>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: D.text, margin: 0, letterSpacing: '-0.02em' }}>
-              Deep Dive: Methodology &amp; Metrics
-            </h2>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {(['all', 'advanced'] as const).map(f => (
-                <button key={f} onClick={() => setDeepDiveFilter(f)}
-                  style={{
-                    padding: '5px 14px', borderRadius: 4, cursor: 'pointer',
-                    fontFamily: D.mono, fontSize: 11, letterSpacing: '0.06em',
-                    textTransform: 'capitalize',
-                    background: deepDiveFilter === f ? D.primary : D.container,
-                    color: deepDiveFilter === f ? '#002e6a' : D.textMuted,
-                    border: `1px solid ${deepDiveFilter === f ? D.primary : D.border}`,
-                    fontWeight: deepDiveFilter === f ? 700 : 400,
-                  }}>
-                  {f === 'all' ? 'All Levels' : 'Advanced'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Active section filter banner */}
-          {activeSection && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20,
-              padding: '10px 16px',
-              background: `${activeSection.color}10`,
-              border: `1px solid ${activeSection.color}30`,
-              borderRadius: 8,
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: activeSection.color }}>{activeSection.title}</span>
-              <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted }}>
-                , {deepDiveConcepts.length} concept{deepDiveConcepts.length !== 1 ? 's' : ''}
-              </span>
-              <button onClick={() => setOpenSection('')}
-                style={{
-                  marginLeft: 'auto', fontSize: 10, fontFamily: D.mono,
-                  color: D.textMuted, background: D.container,
-                  border: `1px solid ${D.border}`, padding: '3px 10px',
-                  borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
-                }}>
-                SHOW ALL ×
-              </button>
-            </div>
-          )}
-
-          {/* Accordion list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {deepDiveConcepts.map((c, idx) => (
-              <div key={`${c.section.id}-${c.term}`}
-                style={{
-                  background: D.surface,
-                  border: `1px solid ${D.border}`,
-                  borderRadius: 8, overflow: 'hidden',
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(173,198,255,0.25)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = D.border}>
-
-                <button
-                  onClick={() => setOpenConcept(openConcept === `deep-${idx}` ? null : `deep-${idx}`)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 24,
-                    padding: '18px 24px', background: 'transparent', border: 'none',
-                    cursor: 'pointer', textAlign: 'left',
-                  }}>
-                  {/* Number */}
-                  <span style={{ fontFamily: D.mono, fontSize: 11, color: D.primary, minWidth: 28, letterSpacing: '0.04em' }}>
-                    {String(idx + 1).padStart(3, '0')}
-                  </span>
-                  {/* Term */}
-                  <span style={{ fontSize: 14, fontWeight: 700, color: D.text, flex: 1 }}>{c.term}</span>
-                  {/* Tags */}
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <span style={{
-                      padding: '2px 8px', fontSize: 9, fontFamily: D.mono,
-                      letterSpacing: '0.08em', textTransform: 'uppercase',
-                      background: `${c.section.color}18`, color: c.section.color,
-                      border: `1px solid ${c.section.color}35`, borderRadius: 3,
-                    }}>{c.tag}</span>
-                    <span style={{
-                      padding: '2px 8px', fontSize: 9, fontFamily: D.mono,
-                      letterSpacing: '0.08em', textTransform: 'uppercase',
-                      background: 'rgba(66,71,84,0.3)', color: D.textMuted,
-                      border: `1px solid ${D.border}`, borderRadius: 3,
-                    }}>{c.section.title.split(' ')[0]}</span>
-                  </div>
-                  {/* Chevron */}
-                  <div style={{ flexShrink: 0, transition: 'transform 0.2s', transform: openConcept === `deep-${idx}` ? 'rotate(180deg)' : 'none' }}>
-                    <ChevronDown size={16} style={{ color: D.textMuted }} />
-                  </div>
-                </button>
-
-                {openConcept === `deep-${idx}` && (
-                  <div style={{ borderTop: `1px solid ${D.border}`, padding: '16px 24px 20px' }}>
-                    <ConceptRow
-                      concept={c}
-                      section={c.section}
-                      isOpen={true}
-                      onToggle={() => {}}
-                      onAskAI={onAskAI}
-                      inlineExpanded
-                    />
-                  </div>
-                )}
+        {/* ── Concepts: a list on the left, the selected concept on the right ── */}
+        {!isSearching && (
+          <section ref={conceptsRef} aria-labelledby="lt-concepts" className="scroll-mt-24 pb-24">
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
+              <div>
+                <h2 id="lt-concepts" className="text-2xl font-semibold tracking-[-0.03em]">Concepts</h2>
+                <p className="mt-2 text-sm tabular-nums text-[#8c909f]">
+                  {shown} {shown === 1 ? 'concept' : 'concepts'}{activeSection ? ` in ${activeSection.title}` : ` across ${groups.length} topics`}
+                  {activeSection && (
+                    <button onClick={() => { setOpenSection(''); setSelectedKey(null) }}
+                      className={`ml-3 inline-flex items-center rounded-sm [@media(pointer:coarse)]:min-h-11 text-[#c2c6d6] underline decoration-white/20 underline-offset-4 [@media(hover:hover)]:hover:text-white ${PRESS} ${FOCUS}`}>Show all topics</button>
+                  )}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <div role="group" aria-label="Level" className="flex rounded-lg p-0.5 ring-1 ring-inset ring-white/[0.08]">
+                {(['all', 'advanced'] as const).map(l => (
+                  <button key={l} aria-pressed={level === l} onClick={() => { setLevel(l); setSelectedKey(null) }}
+                    className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-md px-4 text-[13px] font-medium text-[#8c909f] [@media(hover:hover)]:hover:text-[#e2e2e2] aria-pressed:bg-[#adc6ff] aria-pressed:text-[#002e6a] ${PRESS} ${FOCUS}`}>
+                    {l === 'all' ? 'All levels' : 'Advanced'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {groups.length === 0 ? (
+              <p className="max-w-[48ch] border-t border-white/[0.07] pt-8 text-sm text-[#8c909f]">No concepts match this level. Switch back to All levels.</p>
+            ) : (
+              <ConceptBrowser groups={groups} selectedKey={selectedKey} onSelect={setSelectedKey} onAskAI={onAskAI} showGroupTitles />
+            )}
+          </section>
+        )}
 
-      {/* ── Disclaimer ─────────────────────────────────────────────────────── */}
-      {!isSearching && (
-        <div style={{ padding: '0 64px 80px', maxWidth: 1440, margin: '0 auto' }}>
-          <div style={{
-            background: D.lowest,
-            border: `1px solid ${D.border}`,
-            borderRadius: 12, padding: 24,
-            display: 'flex', alignItems: 'flex-start', gap: 20,
-          }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(66,71,84,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Shield size={16} style={{ color: D.textMuted }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: D.text, marginBottom: 6 }}>Educational Integrity Disclaimer</div>
-              <p style={{ fontSize: 13, color: D.textMuted, lineHeight: 1.65, margin: 0 }}>
-                These definitions are provided for technical transparency and educational purposes only. MarketPulse metrics represent mathematical outputs from historical and predictive models. Past performance is not indicative of future results. No material in this Hub constitutes financial advice.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+        {/* ── Note ── */}
+        {!isSearching && (
+          <footer className="mb-24 max-w-[68ch] border-t border-white/[0.07] pt-8">
+            <h2 className="text-sm font-medium text-[#c2c6d6]">Educational use only</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[#8c909f] [text-wrap:pretty]">
+              These definitions are for learning. MarketPulse metrics come from historical data and simple models. Past performance does not predict future results, and nothing here is financial advice.
+            </p>
+          </footer>
+        )}
+      </div>
     </div>
   )
 }
 
-// ─── Concept Row ───────────────────────────────────────────────────────────────
+// ─── Concept browser: list + detail panel (inline detail on small screens) ────
 
-function ConceptRow({
-  concept, section, isOpen, onToggle, onAskAI, inlineExpanded,
+function ConceptBrowser({
+  groups, selectedKey, onSelect, onAskAI, showGroupTitles,
 }: {
-  concept: Concept; section: Section; isOpen: boolean
-  onToggle: () => void; onAskAI?: (q: string) => void; inlineExpanded?: boolean
+  groups: Group[]; selectedKey: string | null; onSelect: (k: string) => void
+  onAskAI?: (q: string) => void; showGroupTitles: boolean
 }) {
-  const D_local = {
-    text: '#e2e2e2', textSec: '#c2c6d6', textMuted: '#8c909f',
-    border: 'rgba(66,71,84,0.3)', surface: '#1a1c1c', elevated: '#1e2020',
-    mono: 'JetBrains Mono, monospace', body: 'Inter, system-ui, sans-serif',
-  }
+  const flat = useMemo(() => groups.flatMap(g => g.items), [groups])
+  const selected = flat.find(c => keyOf(c) === selectedKey) ?? flat[0]
+  const listRef = useRef<HTMLElement>(null)
 
-  if (inlineExpanded) {
-    return (
-      <div>
-        <p style={{ fontSize: 14, color: D_local.textSec, lineHeight: 1.7, marginBottom: 12 }}>{concept.plain}</p>
-        <div style={{ background: '#0c0f0f', border: `1px solid ${D_local.border}`, borderRadius: 6, padding: '12px 16px', marginBottom: 12 }}>
-          <p style={{ fontSize: 13, color: D_local.textMuted, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-line' }}>{concept.detail}</p>
-        </div>
-        {concept.example && (
-          <div style={{ background: `${section.color}08`, border: `1px solid ${section.color}25`, borderRadius: 6, padding: '10px 16px', marginBottom: 12, display: 'flex', gap: 10 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: section.color, flexShrink: 0 }}>Example:</span>
-            <span style={{ fontSize: 12, color: D_local.textSec }}>{concept.example}</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-          {concept.links?.map(link => {
-            const s = SOURCE_STYLES[link.source]
-            return (
-              <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '5px 10px', borderRadius: 6, textDecoration: 'none', background: s.bg, border: `1px solid ${s.border}`, color: s.color }}>
-                {link.source === 'youtube' ? <Youtube size={11} /> : <FileText size={11} />}
-                {link.label}
-                <ExternalLink size={9} style={{ opacity: 0.6 }} />
-              </a>
-            )
-          })}
-          {onAskAI && (
-            <button onClick={() => onAskAI(`Explain "${concept.term}" in the context of the MarketPulse dashboard`)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '5px 10px', borderRadius: 6, background: 'rgba(208,188,255,0.08)', border: '1px solid rgba(208,188,255,0.2)', color: '#d0bcff', cursor: 'pointer', marginLeft: 'auto' }}>
-              <Sparkles size={10} />
-              Ask AI about this
-            </button>
-          )}
-        </div>
-      </div>
-    )
+  // Up and down move through the list from the keyboard.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const i = flat.findIndex(c => keyOf(c) === keyOf(selected))
+    const next = flat[Math.max(0, Math.min(flat.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]
+    if (!next || next === selected) return
+    e.preventDefault()
+    onSelect(keyOf(next))
+    requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(keyOf(next))}"]`)?.focus())
   }
 
   return (
-    <div>
-      <button onClick={onToggle}
-        style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 20px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-        <div style={{ flex: 1, paddingRight: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: D_local.text }}>{concept.term}</span>
-            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 3, fontFamily: D_local.mono, letterSpacing: '0.06em', textTransform: 'uppercase' as const, background: `${section.color}18`, color: section.color, border: `1px solid ${section.color}35` }}>
-              {concept.tag}
-            </span>
-          </div>
-          <p style={{ fontSize: 12, color: D_local.textSec, margin: 0, lineHeight: 1.55 }}>{concept.plain}</p>
-        </div>
-        <div style={{ flexShrink: 0, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none', marginTop: 2 }}>
-          <ChevronDown size={14} style={{ color: D_local.textMuted }} />
-        </div>
-      </button>
-
-      {isOpen && (
-        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ background: '#0c0f0f', border: `1px solid ${D_local.border}`, borderRadius: 6, padding: '10px 14px' }}>
-            <p style={{ fontSize: 12, color: D_local.textMuted, margin: 0, lineHeight: 1.7, whiteSpace: 'pre-line' }}>{concept.detail}</p>
-          </div>
-          {concept.example && (
-            <div style={{ display: 'flex', gap: 8, padding: '9px 14px', borderRadius: 6, background: `${section.color}08`, border: `1px solid ${section.color}25` }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: section.color, flexShrink: 0 }}>Example:</span>
-              <span style={{ fontSize: 11, color: D_local.textSec }}>{concept.example}</span>
-            </div>
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 4 }}>
-            {concept.links?.map(link => {
-              const s = SOURCE_STYLES[link.source]
-              return (
-                <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 9px', borderRadius: 6, textDecoration: 'none', background: s.bg, border: `1px solid ${s.border}`, color: s.color }}>
-                  {link.source === 'youtube' ? <Youtube size={10} /> : <FileText size={10} />}
-                  {link.label}
-                  <ExternalLink size={8} style={{ opacity: 0.6 }} />
-                </a>
-              )
-            })}
-            {onAskAI && (
-              <button onClick={() => onAskAI(`Explain "${concept.term}" in the context of the MarketPulse dashboard`)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 9px', borderRadius: 6, background: 'rgba(208,188,255,0.08)', border: '1px solid rgba(208,188,255,0.2)', color: '#d0bcff', cursor: 'pointer', marginLeft: 'auto' }}>
-                <Sparkles size={9} />
-                Ask AI
-              </button>
+    <div className="grid items-start gap-x-14 gap-y-8 lg:grid-cols-12">
+      <nav ref={listRef} aria-label="Concepts" onKeyDown={onKeyDown} className="lg:col-span-5">
+        {groups.map(g => (
+          <div key={g.id} className="mb-8 last:mb-0" style={colorVar(g.color)}>
+            {showGroupTitles && (
+              <h3 className="mb-2 flex items-center gap-2.5 px-3 text-[13px] font-medium text-[#c2c6d6]">
+                <span aria-hidden className="size-1.5 rounded-full bg-[color:var(--c)]" />
+                {g.title}
+                <span className="font-normal tabular-nums text-[#8c909f]">{g.items.length}</span>
+              </h3>
             )}
+            <ul className="border-t border-white/[0.07]">
+              {g.items.map(c => {
+                const k = keyOf(c)
+                const active = selected && k === keyOf(selected)
+                return (
+                  <li key={k} className="border-b border-white/[0.07]" style={colorVar(c.section.color)}>
+                    <button data-key={k} aria-current={active ? 'true' : undefined} onClick={() => onSelect(k)}
+                      className={`relative flex w-full items-start justify-between gap-4 px-3 py-3.5 text-left [@media(hover:hover)]:hover:bg-white/[0.035] aria-[current=true]:bg-white/[0.05] ${PRESS} ${FOCUS}`}>
+                      <span aria-hidden className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[color:var(--c)] opacity-0 transition-opacity duration-200 [[aria-current=true]>&]:opacity-100" />
+                      <span className="min-w-0">
+                        <span className="block text-[15px] font-medium tracking-[-0.01em] text-[#e2e2e2]">{c.term}</span>
+                        <span className="mt-0.5 block text-[13px] leading-snug text-[#8c909f] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">{c.plain}</span>
+                      </span>
+                      <span className={`${MONO} mt-1 hidden shrink-0 rounded-[4px] border border-white/10 px-1.5 py-0.5 text-[10px] text-[#8c909f] sm:block`}>{c.tag}</span>
+                    </button>
+                    {/* Small screens: the detail opens under the item. */}
+                    {active && (
+                      <div className="animate-[lt-fade_0.25s_ease-out_backwards] px-3 pb-5 pt-1 motion-reduce:animate-none lg:hidden">
+                        <ConceptDetail c={c} onAskAI={onAskAI} compact />
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
           </div>
-        </div>
+        ))}
+      </nav>
+
+      <article aria-live="polite" key={selected ? keyOf(selected) : 'none'}
+        className={`hidden animate-[lt-fade_0.25s_ease-out_backwards] rounded-2xl p-8 motion-reduce:animate-none lg:sticky lg:top-24 lg:col-span-7 lg:block ${GLASS}`}
+        style={selected ? colorVar(selected.section.color) : undefined}>
+        {selected && <ConceptDetail c={selected} onAskAI={onAskAI} />}
+      </article>
+    </div>
+  )
+}
+
+function ConceptDetail({ c, onAskAI, compact }: { c: ConceptItem; onAskAI?: (q: string) => void; compact?: boolean }) {
+  return (
+    <div style={colorVar(c.section.color)}>
+      {!compact && (
+        <p className="flex items-center gap-3 text-[13px] text-[#8c909f]">
+          <span className="text-[color:var(--c)]">{c.section.title}</span>
+          <span className={`${MONO} rounded-[4px] border border-white/10 px-1.5 py-0.5 text-[10px]`}>{c.tag}</span>
+        </p>
       )}
+      {!compact && <h3 className="mt-4 text-[clamp(1.75rem,3vw,2.25rem)] font-semibold leading-[1.1] tracking-[-0.035em] [text-wrap:balance]">{c.term}</h3>}
+      {!compact && <p className="mt-4 max-w-[56ch] text-lg leading-relaxed text-[#c2c6d6] [text-wrap:pretty]">{c.plain}</p>}
+
+      <p className={`${compact ? 'mt-1' : 'mt-7'} max-w-[64ch] whitespace-pre-line border-l border-white/10 pl-4 text-[14.5px] leading-7 text-[#8c909f] [text-wrap:pretty]`}>{c.detail}</p>
+
+      {c.example && (
+        <p className="mt-5 max-w-[64ch] text-sm leading-relaxed text-[#c2c6d6]">
+          <span className="mr-2 font-medium text-[color:var(--c)]">Example</span>
+          {c.example}
+        </p>
+      )}
+
+      <div className={`${compact ? 'mt-5' : 'mt-8'} flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/[0.07] pt-5 text-[13px]`}>
+        {c.links?.map(link => {
+          const s = SOURCE_STYLES[link.source]
+          return (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer"
+              className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-2 rounded-sm text-[#c2c6d6] [@media(hover:hover)]:hover:text-white ${PRESS} ${FOCUS}`}>
+              <span style={{ color: s.color }} className="inline-flex">{link.source === 'youtube' ? <Youtube size={14} strokeWidth={1.5} aria-hidden /> : <FileText size={14} strokeWidth={1.5} aria-hidden />}</span>
+              <span className="underline decoration-white/20 underline-offset-4">{link.label}</span>
+              <ArrowUpRight size={12} strokeWidth={1.5} className="opacity-60" aria-hidden />
+            </a>
+          )
+        })}
+        {onAskAI && (
+          <button onClick={() => onAskAI(`Explain "${c.term}" in the context of the MarketPulse dashboard`)}
+            className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-2 rounded-sm text-[#d0bcff] [@media(hover:hover)]:hover:text-white sm:ml-auto ${PRESS} ${FOCUS}`}>
+            <Sparkles size={14} strokeWidth={1.5} aria-hidden />
+            Ask AI about this
+          </button>
+        )}
+      </div>
     </div>
   )
 }
