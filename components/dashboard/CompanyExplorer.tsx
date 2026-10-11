@@ -126,6 +126,7 @@ const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 const PRESS = 'transition-[transform,background-color,box-shadow,color,opacity] duration-200 ease-out active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:transform-none'
 const MONO = "[font-family:'JetBrains_Mono',monospace]"
 const RISE = 'animate-[ex-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
+const GROW = 'animate-[ex-grow_0.6s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
 const FIELD = `min-h-11 w-full rounded-lg bg-white/[0.04] px-3.5 text-[15px] text-[#e2e2e2] ring-1 ring-inset ring-white/10 placeholder:text-[#8c909f] [@media(hover:hover)]:hover:ring-white/20 ${FOCUS}`
 const GRAIN =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")"
@@ -148,7 +149,6 @@ export default function CompanyExplorer({
   const [sortKey, setSortKey]       = useState<SortKey>('forecast_30d_upside_pct')
   const [sortDir, setSortDir]       = useState<SortDir>('desc')
   const [page, setPage]             = useState(0)
-  const [chartView, setChartView]   = useState(false)
 
   const sectors  = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.sector))).sort()], [companies])
   const signals  = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.final_signal))).sort()], [companies])
@@ -204,14 +204,15 @@ export default function CompanyExplorer({
     setPage(0)
   }, [sortKey])
 
-  // Top 12 for the bar chart (replaced in a later step)
+  // Top 12 by forecast upside within the current filters, for the ranked list
   const topUpside = useMemo(() =>
     [...filtered]
       .sort((a, b) => b.forecast_30d_upside_pct - a.forecast_30d_upside_pct)
       .slice(0, 12)
   , [filtered])
 
-  const maxUpside = useMemo(() => Math.max(...topUpside.map(c => c.forecast_30d_upside_pct), 1), [topUpside])
+  // Bars start at 0 and share one scale: the largest absolute upside in the list fills the track
+  const scaleMax = useMemo(() => Math.max(...topUpside.map(c => Math.abs(c.forecast_30d_upside_pct)), 0.1), [topUpside])
 
   const riskColor = (r: string) => r === 'High Risk' ? '#F87171' : r === 'Medium Risk' ? '#F59E0B' : '#4edea3'
   const riskDots  = (r: string) => r === 'High Risk' ? 3 : r === 'Medium Risk' ? 2 : 1
@@ -253,7 +254,7 @@ export default function CompanyExplorer({
 
       {/* Everything below the tape: same page pattern as the Learn and Overview tabs */}
       <div className="relative isolate w-full overflow-hidden bg-[#121414] font-sans text-[#e2e2e2] antialiased">
-        <style>{'@keyframes ex-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}'}</style>
+        <style>{'@keyframes ex-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}@keyframes ex-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}'}</style>
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute inset-x-0 top-0 h-[640px] bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(60%_80%_at_28%_0%,#000,transparent)]" />
           <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: GRAIN, backgroundSize: '160px 160px' }} />
@@ -419,8 +420,18 @@ export default function CompanyExplorer({
                   })}
                   {!paginated.length && (
                     <tr><td colSpan={11} className="px-6 py-14 text-center">
-                      <p className="text-lg font-medium text-[#e2e2e2]">No companies match your filters.</p>
-                      <p className="mt-1.5 text-[15px] text-[#8c909f]">Reset the filters to see all {companies.length} companies.</p>
+                      {companies.length === 0 ? (
+                        <p className="text-lg font-medium text-[#e2e2e2]">Company data isn&apos;t available right now.</p>
+                      ) : (
+                        <>
+                          <p className="text-lg font-medium text-[#e2e2e2]">No companies match your filters.</p>
+                          <p className="mt-1.5 text-[15px] text-[#8c909f]">Try widening the upside range, or show all {companies.length} companies.</p>
+                          <button type="button" onClick={resetFilters}
+                            className={`mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#adc6ff] px-5 text-sm font-semibold text-[#002e6a] [@media(hover:hover)]:hover:brightness-110 ${PRESS} ${FOCUS}`}>
+                            <RotateCcw size={14} strokeWidth={1.5} aria-hidden /> Reset filters
+                          </button>
+                        </>
+                      )}
                     </td></tr>
                   )}
                 </tbody>
@@ -432,7 +443,7 @@ export default function CompanyExplorer({
             {/* Pagination */}
             <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] px-5 py-3.5">
               <span className="text-sm tabular-nums text-[#8c909f]">
-                Showing {sorted.length > 0 ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, sorted.length)}` : '0'} of {sorted.length} companies
+                Showing {sorted.length > 0 ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, sorted.length)}` : '0'} of {sorted.length} {sorted.length === 1 ? 'company' : 'companies'}
               </span>
               <div className="flex items-center gap-1.5">
                 <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className={pageBtn}>‹</button>
@@ -456,78 +467,45 @@ export default function CompanyExplorer({
             </nav>
           </section>
 
-          {/* ── Top companies chart (legacy styling, replaced in a later step) ── */}
-          <section aria-labelledby="ex-chart-legacy" className="mb-20">
-      {/* ── Top Companies — Stitch bar chart ─────────────────────────────── */}
-      <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 4 }}>
-        {/* Section header with horizontal rule */}
-        <div style={{ padding: '18px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-            <h2 id="ex-chart-legacy" style={{ fontSize: 14, fontWeight: 600, color: D.text, fontFamily: D.body, whiteSpace: 'nowrap', margin: 0 }}>Top Companies by 30-Day Forecast Upside</h2>
-            <div style={{ flex: 1, height: 1, background: D.border, minWidth: 40 }} />
-          </div>
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            {['TABLE VIEW', 'CHART VIEW'].map(v => (
-              <button key={v} onClick={() => setChartView(v === 'CHART VIEW')}
-                style={{
-                  fontSize: 10, fontFamily: D.mono, padding: '4px 10px', borderRadius: 0,
-                  cursor: 'pointer', letterSpacing: '0.08em', textTransform: 'uppercase' as const, transition: 'all 0.12s',
-                  background: (v === 'CHART VIEW') === chartView ? D.primary : D.surface,
-                  color: (v === 'CHART VIEW') === chartView ? '#002e6a' : D.textMuted,
-                  border: `1px solid ${(v === 'CHART VIEW') === chartView ? D.primary : D.border}`,
-                }}>
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Stitch-style bar chart */}
-        <div style={{ padding: '24px 20px', position: 'relative' }}>
-          {/* Grid lines + % labels — absolute positioned behind bars */}
-          <div style={{ position: 'relative', height: 320, background: `${D.container}50`, border: `1px solid ${D.border}`, borderRadius: 4, padding: '16px 16px 48px' }}>
-            {/* Y-axis grid lines */}
-            {[25, 20, 15, 10, 5].map(pct => (
-              <div key={pct} style={{ position: 'absolute', left: 0, right: 0, bottom: `${48 + (pct / 30) * (320 - 64)}px`, borderTop: `1px solid rgba(66,71,84,0.12)`, display: 'flex', justifyContent: 'flex-end', paddingRight: 8 }}>
-                <span style={{ fontSize: 9, fontFamily: D.mono, color: `${D.textMuted}60`, marginTop: -10 }}>{pct}%</span>
+          {/* ── Top companies: ranked list on a true 0-based scale ─────────── */}
+          <section aria-labelledby="ex-top" className={`mb-20 rounded-2xl p-5 sm:p-7 ${GLASS}`}>
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+              <div>
+                <h2 id="ex-top" className="text-2xl font-semibold tracking-[-0.02em] text-[#e2e2e2] sm:text-[28px]">Top forecast upside</h2>
+                <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-[#8c909f]">
+                  {topUpside.length === 0 ? 'Companies ranked by 30-day forecast upside appear here.' : `${topUpside.length === 1 ? 'The company' : `The ${topUpside.length} companies`} with the highest 30-day forecast upside under your current filters. Every bar starts at 0%, so lengths compare directly.`}
+                </p>
               </div>
-            ))}
-
-            {/* Bars grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${topUpside.length}, 1fr)`, gap: 4, height: '100%', alignItems: 'flex-end' }}>
-              {topUpside.map(c => {
-                const pct = c.forecast_30d_upside_pct
-                const barHeightPct = Math.max(2, (pct / Math.max(maxUpside * 1.1, 1)) * 100)
-                return (
-                  <div key={c.symbol}
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', height: '100%', justifyContent: 'flex-end' }}
-                    onClick={() => onViewForecast(c)}
-                    title={`${c.symbol}: +${pct.toFixed(1)}%`}>
-                    {/* Bar — Stitch style: translucent fill + top/side borders in tertiary */}
-                    <div style={{
-                      width: '100%',
-                      height: `${barHeightPct}%`,
-                      background: 'rgba(78,222,163,0.15)',
-                      borderLeft: '1px solid rgba(78,222,163,0.6)',
-                      borderRight: '1px solid rgba(78,222,163,0.6)',
-                      borderTop: '1px solid rgba(78,222,163,0.9)',
-                      transition: 'background 0.15s',
-                    }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(78,222,163,0.30)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(78,222,163,0.15)'}
-                    />
-                    {/* Ticker label */}
-                    <span style={{ fontSize: 10, fontFamily: D.mono, color: D.textMuted, letterSpacing: '0.04em', textAlign: 'center', lineHeight: 1 }}>
-                      {c.symbol}
-                    </span>
-                  </div>
-                )
-              })}
+              {topUpside.length > 0 && <p className="text-sm tabular-nums text-[#8c909f]">Full bar = {scaleMax.toFixed(1)}%</p>}
             </div>
-          </div>
-        </div>
-      </div>
 
+            {topUpside.length === 0 ? (
+              <p className="mt-8 rounded-xl bg-white/[0.03] px-5 py-10 text-center text-[15px] text-[#8c909f]">No companies to rank. Change or reset the filters above.</p>
+            ) : (
+              <ol className="mt-6 grid gap-1">
+                {topUpside.map((c, i) => {
+                  const pct = c.forecast_30d_upside_pct
+                  const width = Math.max(1.5, (Math.abs(pct) / scaleMax) * 100)
+                  const color = pct >= 0 ? '#4edea3' : '#F87171'
+                  return (
+                    <li key={c.symbol}>
+                      <button type="button" onClick={() => onViewForecast(c)}
+                        aria-label={`View forecast for ${c.symbol}, ${c.company_name}, ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% forecast`}
+                        className={`grid min-h-11 w-full grid-cols-[3.75rem_minmax(0,1fr)_4rem] items-center gap-x-2 rounded-lg px-1.5 py-1.5 text-left sm:grid-cols-[1.75rem_4.5rem_11rem_minmax(0,1fr)_4.75rem] sm:gap-x-4 sm:px-3 [@media(hover:hover)]:hover:bg-white/[0.05] ${PRESS} ${FOCUS}`}>
+                        <span aria-hidden className={`${MONO} hidden text-sm tabular-nums text-[#8c909f] sm:block`}>{i + 1}</span>
+                        <span className={`${MONO} text-[15px] font-bold text-[#e2e2e2]`}>{c.symbol}</span>
+                        <span className="hidden truncate text-[15px] text-[#c2c6d6] sm:block">{c.company_name}</span>
+                        <span aria-hidden className="relative h-3 overflow-hidden rounded-full bg-white/[0.06]">
+                          <span className={`absolute inset-y-0 left-0 origin-left rounded-full ${GROW}`}
+                            style={{ width: `${width}%`, background: color, animationDelay: `${i * 30}ms` }} />
+                        </span>
+                        <span className={`${MONO} text-right text-[15px] font-semibold tabular-nums`} style={{ color }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
           </section>
 
         </div>
