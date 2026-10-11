@@ -1,7 +1,7 @@
 'use client'
 
 import { LIST_NAME_LOWER } from '@/lib/riskLab'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Search, GitBranch, Bot, RotateCcw, Bookmark } from 'lucide-react'
 import type { CompanySummary } from '@/lib/types'
 import { formatCurrency, getSignalColor } from '@/lib/formatters'
@@ -129,6 +129,8 @@ const RISE = 'animate-[ex-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion
 const FIELD = `min-h-11 w-full rounded-lg bg-white/[0.04] px-3.5 text-[15px] text-[#e2e2e2] ring-1 ring-inset ring-white/10 placeholder:text-[#8c909f] [@media(hover:hover)]:hover:ring-white/20 ${FOCUS}`
 const GRAIN =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")"
+// Pinned first column: opaque so scrolled cells never show through it
+const PIN = 'sticky left-0 z-10 bg-[#1a1c1c] shadow-[1px_0_0_rgba(255,255,255,0.08)]'
 const cssVar = (hex: string) => ({ '--c': hex } as React.CSSProperties)
 
 export default function CompanyExplorer({
@@ -215,6 +217,19 @@ export default function CompanyExplorer({
   const riskDots  = (r: string) => r === 'High Risk' ? 3 : r === 'Medium Risk' ? 2 : 1
   const riskLabel = (r: string) => r === 'High Risk' ? 'H' : r === 'Medium Risk' ? 'M' : 'L'
 
+  // Fade on the right edge while the table has more columns to scroll to
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [moreRight, setMoreRight] = useState(false)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const check = () => setMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    window.addEventListener('resize', check)
+    return () => { el.removeEventListener('scroll', check); window.removeEventListener('resize', check) }
+  }, [])
+
   const columns: { key: SortKey; label: string; align?: 'right' }[] = [
     { key: 'symbol', label: 'Ticker' },
     { key: 'company_name', label: 'Name' },
@@ -271,8 +286,8 @@ export default function CompanyExplorer({
           {/* ── Filters ────────────────────────────────────────────────── */}
           <section aria-labelledby="ex-filters" className={`mb-6 rounded-2xl p-5 sm:p-6 ${GLASS}`}>
             <h2 id="ex-filters" className="sr-only">Filters</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
-              <label className="block min-w-0 sm:col-span-2 lg:col-span-5">
+            <div className="grid gap-4 sm:grid-cols-6 lg:grid-cols-12">
+              <label className="block min-w-0 sm:col-span-6 lg:col-span-5">
                 <span className="mb-1.5 block text-sm text-[#8c909f]">Search</span>
                 <span className="relative block">
                   <Search size={16} strokeWidth={1.5} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c909f]" aria-hidden />
@@ -282,9 +297,9 @@ export default function CompanyExplorer({
                 </span>
               </label>
               {[
-                { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectors, span: 'lg:col-span-2' },
-                { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signals, span: 'lg:col-span-3' },
-                { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: risks,   span: 'lg:col-span-2' },
+                { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectors, span: 'sm:col-span-2 lg:col-span-2' },
+                { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signals, span: 'sm:col-span-2 lg:col-span-3' },
+                { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: risks,   span: 'sm:col-span-2 lg:col-span-2' },
               ].map(({ label, val, set, opts, span }) => (
                 <label key={label} className={`block min-w-0 ${span}`}>
                   <span className="mb-1.5 block text-sm text-[#8c909f]">{label}</span>
@@ -327,16 +342,16 @@ export default function CompanyExplorer({
           {/* ── Table ──────────────────────────────────────────────────── */}
           <section aria-labelledby="ex-table" className={`mb-12 overflow-hidden rounded-2xl lg:mb-14 ${GLASS}`}>
             <h2 id="ex-table" className="sr-only">Companies</h2>
-            <div className="overflow-x-auto">
+            <div className="relative">
+            <div ref={scrollRef} role="region" aria-label="Companies table, scrolls sideways" tabIndex={0} className={`overflow-x-auto ${FOCUS} focus-visible:-outline-offset-2`}>
               <table className="w-full min-w-[1040px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-white/[0.08]">
-                    <th scope="col" className="px-4 py-3.5 pl-5 text-sm font-medium text-[#8c909f]">Open</th>
-                    <th scope="col" className="px-2 py-3.5 text-sm font-medium text-[#8c909f]">Save</th>
-                    {columns.map(col => {
+                    {columns.map((col, i) => {
                       const active = sortKey === col.key
-                      return (
-                        <th key={col.key} scope="col" aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-1 py-1.5">
+                      const th = (
+                        <th key={col.key} scope="col" aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          className={`px-1 py-1.5 ${i === 0 ? `${PIN} pl-3` : ''}`}>
                           <button type="button" onClick={() => handleSort(col.key)}
                             className={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap [@media(hover:hover)]:hover:bg-white/[0.06] [@media(pointer:coarse)]:min-h-11 ${active ? 'text-[#adc6ff]' : 'text-[#8c909f]'} ${PRESS} ${FOCUS}`}>
                             {col.label}
@@ -344,7 +359,10 @@ export default function CompanyExplorer({
                           </button>
                         </th>
                       )
+                      return th
                     })}
+                    <th scope="col" className="px-4 py-3.5 text-sm font-medium text-[#8c909f]">Open</th>
+                    <th scope="col" className="px-2 py-3.5 pr-5 text-sm font-medium text-[#8c909f]">Save</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -357,28 +375,9 @@ export default function CompanyExplorer({
                     const watched = watchedSymbols.includes(c.symbol)
                     const mapeColor = c.best_model_mape < 2 ? '#4edea3' : c.best_model_mape < 5 ? '#F59E0B' : '#F87171'
                     return (
-                      <tr key={c.symbol} className="border-b border-white/[0.06] last:border-b-0 [@media(hover:hover)]:hover:bg-white/[0.035]">
-                        <td className="px-4 py-3 pl-5 whitespace-nowrap">
-                          <div className="flex gap-1.5">
-                            <button type="button" onClick={() => onViewForecast(c)} aria-label={`View forecast for ${c.symbol}`} title="View forecast" className={`${iconBtn} text-[#adc6ff]`}>
-                              <GitBranch size={15} strokeWidth={1.5} aria-hidden />
-                            </button>
-                            <button type="button" onClick={() => onViewAI(c)} aria-label={`Ask AI about ${c.symbol}`} title="Ask AI" className={`${iconBtn} text-[#d0bcff]`}>
-                              <Bot size={15} strokeWidth={1.5} aria-hidden />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <button type="button" aria-pressed={watched}
-                            onClick={e => { e.stopPropagation(); onToggleWatchlist?.(c.symbol) }}
-                            title={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
-                            aria-label={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
-                            className={`${iconBtn} ${watched ? '!bg-[#d0bcff]/15 !text-[#d0bcff] !ring-[#d0bcff]/40' : ''}`}>
-                            <Bookmark size={15} strokeWidth={1.5} fill={watched ? '#d0bcff' : 'none'} aria-hidden />
-                          </button>
-                        </td>
-                        <td className={`${MONO} px-4 py-3 text-[16px] font-bold whitespace-nowrap text-[#e2e2e2]`}>{c.symbol}</td>
-                        <td className="max-w-[220px] truncate px-4 py-3 text-[15px] text-[#c2c6d6]" title={c.company_name}>{c.company_name}</td>
+                      <tr key={c.symbol} className="group border-b border-white/[0.06] last:border-b-0 [@media(hover:hover)]:hover:bg-white/[0.035]">
+                        <td className={`${MONO} ${PIN} px-4 py-3 pl-6 text-[16px] font-bold whitespace-nowrap text-[#e2e2e2] [@media(hover:hover)]:group-hover:bg-[#202323]`}>{c.symbol}</td>
+                        <td className="max-w-[132px] truncate px-3 py-3 text-[15px] sm:max-w-[220px] sm:px-4 text-[#c2c6d6]" title={c.company_name}>{c.company_name}</td>
                         <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums text-[#e2e2e2]`}>{formatCurrency(c.latest_price)}</td>
                         <td className={`${MONO} px-4 py-3 text-[15px] font-semibold whitespace-nowrap tabular-nums ${up >= 0 ? 'text-[#4edea3]' : 'text-[#F87171]'}`}>{up >= 0 ? '+' : ''}{up.toFixed(1)}%</td>
                         <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums`} style={{ color: mapeColor }}>{c.best_model_mape.toFixed(1)}%</td>
@@ -393,8 +392,27 @@ export default function CompanyExplorer({
                         </td>
                         <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums text-[#c2c6d6]`}>{c.annualized_volatility_pct.toFixed(1)}%</td>
                         <td className={`${MONO} px-4 py-3 text-[15px] whitespace-nowrap tabular-nums text-[#c2c6d6]`}>{c.profit_margin_pct != null ? `${c.profit_margin_pct.toFixed(1)}%` : 'n/a'}</td>
-                        <td className="px-4 py-3 pr-5 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span style={cssVar(sc)} className={`${MONO} inline-block rounded-[4px] bg-[color:color-mix(in_srgb,var(--c)_10%,transparent)] px-2 py-1 text-[11px] font-medium text-[color:var(--c)] ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_30%,transparent)]`}>{slabel}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex gap-1.5">
+                            <button type="button" onClick={() => onViewForecast(c)} aria-label={`View forecast for ${c.symbol}`} title="View forecast" className={`${iconBtn} text-[#adc6ff]`}>
+                              <GitBranch size={15} strokeWidth={1.5} aria-hidden />
+                            </button>
+                            <button type="button" onClick={() => onViewAI(c)} aria-label={`Ask AI about ${c.symbol}`} title="Ask AI" className={`${iconBtn} text-[#d0bcff]`}>
+                              <Bot size={15} strokeWidth={1.5} aria-hidden />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3 pr-5 whitespace-nowrap">
+                          <button type="button" aria-pressed={watched}
+                            onClick={e => { e.stopPropagation(); onToggleWatchlist?.(c.symbol) }}
+                            title={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
+                            aria-label={watched ? `Remove ${c.symbol} from ${LIST_NAME_LOWER}` : `Add ${c.symbol} to ${LIST_NAME_LOWER}`}
+                            className={`${iconBtn} ${watched ? '!bg-[#d0bcff]/15 !text-[#d0bcff] !ring-[#d0bcff]/40' : ''}`}>
+                            <Bookmark size={15} strokeWidth={1.5} fill={watched ? '#d0bcff' : 'none'} aria-hidden />
+                          </button>
                         </td>
                       </tr>
                     )
@@ -408,6 +426,8 @@ export default function CompanyExplorer({
                 </tbody>
               </table>
             </div>
+            <div aria-hidden className={`pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#121414]/80 to-transparent transition-opacity duration-200 motion-reduce:transition-none ${moreRight ? 'opacity-100' : 'opacity-0'}`} />
+            </div>
 
             {/* Pagination */}
             <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] px-5 py-3.5">
@@ -416,18 +436,19 @@ export default function CompanyExplorer({
               </span>
               <div className="flex items-center gap-1.5">
                 <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className={pageBtn}>‹</button>
+                <span className="px-2 text-sm tabular-nums text-[#c2c6d6] sm:hidden">Page {Math.min(page + 1, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)}</span>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const p = Math.max(0, Math.min(page - 2, totalPages - 5)) + i
                   const on = p === page
                   return (
                     <button key={p} type="button" onClick={() => setPage(p)} aria-current={on ? 'page' : undefined} aria-label={`Page ${p + 1}`}
-                      className={`${pageBtn} tabular-nums ${on ? '!bg-[#adc6ff]/15 !text-[#adc6ff] !ring-[#adc6ff]/50' : ''}`}>{p + 1}</button>
+                      className={`${pageBtn} max-sm:hidden tabular-nums ${on ? '!bg-[#adc6ff]/15 !text-[#adc6ff] !ring-[#adc6ff]/50' : ''}`}>{p + 1}</button>
                   )
                 })}
                 {totalPages > 5 && page < totalPages - 3 && (
                   <>
-                    <span aria-hidden className="px-1 text-sm text-[#8c909f]">…</span>
-                    <button type="button" onClick={() => setPage(totalPages - 1)} aria-label={`Page ${totalPages}`} className={`${pageBtn} tabular-nums`}>{totalPages}</button>
+                    <span aria-hidden className="px-1 text-sm text-[#8c909f] max-sm:hidden">…</span>
+                    <button type="button" onClick={() => setPage(totalPages - 1)} aria-label={`Page ${totalPages}`} className={`${pageBtn} max-sm:hidden tabular-nums`}>{totalPages}</button>
                   </>
                 )}
                 <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Next page" className={pageBtn}>›</button>
