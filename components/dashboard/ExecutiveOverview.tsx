@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { CheckCircle } from 'lucide-react'
 import type {
   CompanySummary, SectorSummary, KPIs, ModelErrorBand,
   SignalSnapshot, SignalPerformanceSummary,
@@ -62,8 +61,9 @@ export default function ExecutiveOverview({
   const [filterSignal, setFilterSignal] = useState(ALL)
   const [filterRisk,   setFilterRisk]   = useState(ALL)
   const [modelErrorBands, setModelErrorBands] = useState<ModelErrorBand[]>([])
+  const [bandsLoaded, setBandsLoaded] = useState(false)
 
-  useEffect(() => { loadModelErrorBands().then(setModelErrorBands) }, [])
+  useEffect(() => { loadModelErrorBands().then(setModelErrorBands).finally(() => setBandsLoaded(true)) }, [])
 
   const sectorOptions = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.sector))).sort()], [companies])
   const signalOptions = useMemo(() => [ALL, ...Array.from(new Set(companies.map(c => c.final_signal))).sort()], [companies])
@@ -74,6 +74,13 @@ export default function ExecutiveOverview({
     (filterSignal === ALL || c.final_signal === filterSignal) &&
     (filterRisk   === ALL || c.risk_level   === filterRisk)
   ), [companies, filterSector, filterSignal, filterRisk])
+
+  const dataDate = useMemo(() => {
+    const dates = companies.map(c => c.latest_date).filter(Boolean)
+    if (!dates.length) return null
+    const [y, m, d] = dates.reduce((a, b) => (a > b ? a : b)).split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }, [companies])
 
   const hasFilters = filterSector !== ALL || filterSignal !== ALL || filterRisk !== ALL
 
@@ -102,25 +109,16 @@ export default function ExecutiveOverview({
 
   const totalSignal = signalData.reduce((s, d) => s + d.count, 0)
 
-  const reliabilityIndex = useMemo(() => {
-    if (!modelErrorBands.length) return null
-    const total    = modelErrorBands.reduce((s, b) => s + b.company_count, 0)
-    const weighted = modelErrorBands.reduce((s, b) => {
-      const w = { 'Elite Reliability': 100, 'Very Strong Reliability': 85, 'Strong Reliability': 70, 'Moderate Reliability': 45, 'Higher Error': 20 }
-      return s + (w[b.model_error_band as keyof typeof w] ?? 0) * b.company_count
-    }, 0)
-    return (weighted / (total * 100) * 100).toFixed(1)
-  }, [modelErrorBands])
-
   // One description per signal, shown once in the Signals section (copy is revised in a later step).
   const SIGNAL_DESC: Record<string, string> = {
-    'Potential Opportunity':       'Stocks with adaptive forecast alpha and low variance signals.',
-    'High Volatility Speculative': 'High momentum names with extreme volatility characteristics.',
-    'Stable Watchlist':            'Consistent performers with high model confidence scores.',
-    'Needs Further Review':        'Data points with anomalous patterns requiring manual verification.',
+    'Potential Opportunity':                 'A positive forecast backed by a reliable model and a manageable risk profile.',
+    'Stable Watchlist':                      'Steady names with no major red flags, but a forecast below the Opportunity bar.',
+    'High Volatility Speculative':           'Volatility far above the sector median, which lowers confidence in the forecast.',
+    'Needs Further Review':                  'Signals conflict or the data looks unusual, so it needs a closer look.',
+    'Weak Fundamentals / Negative Forecast': 'Weak fundamentals together with a negative forecast.',
   }
 
-  const selectClass = `w-full appearance-none rounded-full bg-[#1e2020] py-2 pl-5 pr-9 text-xs font-medium text-[#e2e2e2] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:ring-white/20 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`
+  const selectClass = `w-full min-h-10 appearance-none rounded-md bg-[#1e2020] py-2 pl-3.5 pr-9 text-[13px] text-[#e2e2e2] ring-1 ring-inset ring-white/10 [@media(hover:hover)]:hover:ring-white/20 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`
 
   return (
     <div className="relative font-sans text-[#e2e2e2] antialiased">
@@ -145,23 +143,26 @@ export default function ExecutiveOverview({
       />
 
       {/* Filters: these change the figures, signals and chart below */}
-      <section aria-label="Filters" className="mb-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <section aria-label="Filters" className="mb-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
         {[
           { label: 'Sector', val: filterSector, set: setFilterSector, opts: sectorOptions },
           { label: 'Signal', val: filterSignal, set: setFilterSignal, opts: signalOptions },
           { label: 'Risk',   val: filterRisk,   set: setFilterRisk,   opts: riskOptions   },
         ].map(({ label, val, set, opts }) => (
-          <div key={label} className="relative sm:min-w-[170px]">
-            <select value={val} onChange={e => set(e.target.value)} aria-label={`Filter by ${label.toLowerCase()}`} className={selectClass}>
-              {opts.map(o => (
-                <option key={o} value={o} className="bg-[#1e2020]">{o === ALL ? `${label}: All` : o}</option>
-              ))}
-            </select>
-            <svg aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8c909f]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
-          </div>
+          <label key={label} className="block sm:min-w-[180px]">
+            <span className="mb-1.5 block text-xs text-[#8c909f]">{label}</span>
+            <span className="relative block">
+              <select value={val} onChange={e => set(e.target.value)} className={selectClass}>
+                {opts.map(o => (
+                  <option key={o} value={o} className="bg-[#1e2020]">{o}</option>
+                ))}
+              </select>
+              <svg aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8c909f]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+          </label>
         ))}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:ml-auto">
-          <span className={`${MONO} text-[11px] text-[#8c909f]`}>{hasFilters ? 'Filters:' : 'Filters Applied: None'}</span>
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pb-2 sm:ml-auto">
+          <span className={`${MONO} text-[11px] text-[#8c909f]`}>{hasFilters ? 'Filtering by' : 'No filters applied'}</span>
           {hasFilters && (
             <>
               <span className={`${MONO} text-[11px] text-[#e2e2e2]`}>
@@ -182,17 +183,17 @@ export default function ExecutiveOverview({
           <h2 id="ov-figures" className="sr-only">Key figures</h2>
           <div className="grid gap-x-14 gap-y-10 lg:grid-cols-12">
             <div className="lg:col-span-5">
-              <div className="text-sm text-[#8c909f]">Avg 30D Upside</div>
+              <div className="text-sm text-[#8c909f]">Average 30-day forecast upside</div>
               <div style={{ color: k.upside >= 0 ? C.positive : C.negative }}
                 className="mt-2 text-[clamp(3.25rem,7vw,5rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums">{formatPercent(k.upside)}</div>
-              <div className={`${MONO} mt-3 text-[11px] text-[#8c909f]`}>Model forecast mean</div>
+              <div className={`${MONO} mt-3 text-[11px] text-[#8c909f]`}>Mean of the model&apos;s forecasts</div>
             </div>
             <ul className="grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/[0.08] pt-8 lg:col-span-7 lg:border-l lg:border-t-0 lg:pl-14 lg:pt-0">
               {[
-                { label: 'Companies',     value: k.companies.toLocaleString(), sub: 'Active in universe',  color: '#e2e2e2', clickable: true },
-                { label: 'Model MAPE',    value: `${k.mape.toFixed(2)}%`,      sub: 'System error margin', color: C.blue },
-                { label: 'Volatility',    value: `${k.vol.toFixed(1)}%`,       sub: 'Aggregate index',     color: '#e2e2e2' },
-                { label: 'Profit Margin', value: `${k.margin.toFixed(1)}%`,    sub: 'Mean sector yield',   color: '#e2e2e2' },
+                { label: 'Companies',     value: k.companies.toLocaleString(), sub: 'Companies in this dataset', color: '#e2e2e2', clickable: true },
+                { label: 'Average forecast error (MAPE)', value: `${k.mape.toFixed(2)}%`, sub: 'Mean across companies', color: C.blue },
+                { label: 'Average volatility', value: `${k.vol.toFixed(1)}%`, sub: 'Annualized, mean across companies', color: '#e2e2e2' },
+                { label: 'Average profit margin', value: `${k.margin.toFixed(1)}%`, sub: 'Mean across companies', color: '#e2e2e2' },
               ].map(({ label, value, sub, color, clickable }) => {
                 const inner = (
                   <>
@@ -252,14 +253,14 @@ export default function ExecutiveOverview({
           </ul>
           {k && k.opportunity > 0 && (
             <p className="mt-5 max-w-[60ch] text-xs leading-relaxed text-[#8c909f]">
-              {k.opportunity} companies meet the Potential Opportunity criteria based on adaptive forecast, model reliability, and risk profile.
+              {k.opportunity} companies are labelled Potential Opportunity, based on the forecast, model reliability, and risk profile.
             </p>
           )}
         </div>
 
         <div className="min-w-0 lg:col-span-5">
           <h2 className="mb-1 text-xl font-semibold tracking-[-0.02em]">Model error distribution by MAPE band</h2>
-          <p className="mb-5 text-sm text-[#8c909f]">Companies grouped by how closely the model tracked them.</p>
+          <p className="mb-5 text-sm text-[#8c909f]">MAPE is the model&apos;s average percentage error on past prices. Lower is better.</p>
           {modelErrorBands.length > 0 ? (
             <>
               <div className="border-t border-white/[0.08] pt-6">
@@ -292,28 +293,28 @@ export default function ExecutiveOverview({
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-4 flex items-center justify-between border-t border-white/[0.08] pt-4">
-                <span className={`${MONO} text-[10px] text-[#8c909f]`}>Reliability Index</span>
-                <span className={`${MONO} text-xs font-bold tabular-nums text-[#adc6ff]`}>{reliabilityIndex}/100</span>
-              </div>
             </>
+          ) : bandsLoaded ? (
+            <p className="border-t border-white/[0.08] pt-6 text-sm leading-relaxed text-[#8c909f]">The error distribution could not be loaded right now. Reload the page to try again.</p>
           ) : (
-            <div className="flex h-56 items-center justify-center border-t border-white/[0.08] text-[13px] text-[#8c909f]">Loading…</div>
+            <div aria-busy="true" aria-label="Loading model error distribution" className="border-t border-white/[0.08] pt-6">
+              <div className="flex h-[220px] items-end justify-around gap-6 px-6">
+                {[40, 100, 55, 8].map((h, i) => (
+                  <span key={i} className="block w-8 animate-pulse rounded-t bg-white/[0.07] motion-reduce:animate-none" style={{ height: `${h}%` }} />
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </section>
 
       {/* Data note */}
-      <section className="mb-24 max-w-[68ch] border-t border-white/[0.08] pt-8">
-        <div className="mb-2.5 flex items-center gap-2">
-          <CheckCircle size={14} strokeWidth={1.5} className="text-[#F59E0B]" aria-hidden />
-          <span className={`${MONO} text-[11px] text-[#F59E0B]`}>System Integrity · Secure</span>
-        </div>
-        <h2 className="mb-2 text-xl font-semibold tracking-[-0.01em]">Real-time Data Validation</h2>
-        <p className="m-0 text-[13px] leading-relaxed text-[#8c909f]">
-          Dashboard data sourced from Databricks pipeline.{' '}
+      <section aria-labelledby="ov-data" className="mb-24 max-w-[68ch] border-t border-white/[0.08] pt-8">
+        <h2 id="ov-data" className="mb-2 text-base font-semibold tracking-[-0.01em]">About this data</h2>
+        <p className="m-0 text-[13px] leading-relaxed text-[#8c909f] [text-wrap:pretty]">
+          Prices come from Yahoo Finance and are refreshed on weekdays after the US market closes{dataDate ? `. Latest prices: ${dataDate}` : ''}. Company fundamentals such as profit margin come from a static dataset and can lag. {' '}
           {filtered.length === companies.length
-            ? `All ${companies.length} S&P 500 companies loaded. CSV-based static deployment. Refresh for latest exported data.`
+            ? `All ${companies.length} companies are shown.`
             : `Showing ${filtered.length} of ${companies.length} companies based on active filters.`}
         </p>
       </section>

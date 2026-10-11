@@ -110,7 +110,7 @@ export default function DailyBriefing({
   // Normalize sector bar widths
   const maxSectorUpside = Math.max(...briefing.topSectors.map(s => Math.abs(s.avg_forecast_30d_upside_pct)), 0.01)
 
-  const outlineBtn = `min-h-9 rounded-full px-5 py-2 text-xs font-semibold text-[#adc6ff] ring-1 ring-inset ring-[#adc6ff]/70 [@media(hover:hover)]:hover:bg-[#adc6ff]/10 [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`
+  const linkBtn = `-ml-1 inline-flex min-h-9 items-center rounded-sm px-1 text-[13px] font-medium text-[#adc6ff] underline decoration-[#adc6ff]/40 underline-offset-4 [@media(hover:hover)]:hover:decoration-[#adc6ff] [@media(pointer:coarse)]:min-h-11 ${PRESS} ${FOCUS}`
 
   return (
     <section aria-labelledby="ov-briefing" className="mb-16 lg:mb-20">
@@ -120,51 +120,45 @@ export default function DailyBriefing({
       </div>
 
       <div className="grid gap-x-12 gap-y-10 lg:grid-cols-12">
-        {/* Top alerts */}
+        {/* Standouts */}
         <div className="min-w-0 lg:col-span-5">
-          <PanelLabel>Top alerts</PanelLabel>
-          <div className="flex flex-col gap-2.5">
+          <PanelLabel>Today&apos;s standouts</PanelLabel>
+          <ul className="divide-y divide-white/[0.08] border-y border-white/[0.08]">
             {briefing.topOpportunity ? (
-              <div style={cssVar(C.positive)} className="flex items-center justify-between gap-4 rounded-lg bg-[color:color-mix(in_srgb,var(--c)_6%,transparent)] px-4 py-3 ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_18%,transparent)]">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <TrendingUp size={14} strokeWidth={1.5} className="shrink-0 text-[color:var(--c)]" aria-hidden />
+              <li style={cssVar(C.positive)} className="flex items-center justify-between gap-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <TrendingUp size={15} strokeWidth={1.5} className="shrink-0 text-[color:var(--c)]" aria-hidden />
                   <div className="min-w-0">
-                    <div className={`${MONO} text-[15px] font-bold text-[color:var(--c)]`}>{briefing.topOpportunity.symbol}</div>
-                    <div className="text-[11px] text-[#8c909f]">Predictive Opportunity</div>
+                    <div className={`${MONO} text-[15px] font-bold text-[#e2e2e2]`}>{briefing.topOpportunity.symbol}</div>
+                    <div className="text-xs text-[#8c909f]">Highest 30-day forecast upside</div>
                   </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  <div className={`${MONO} text-[16px] font-bold tabular-nums text-[color:var(--c)]`}>{formatPercent(briefing.topOpportunity.forecast_30d_upside_pct, 1)}</div>
-                  <div className="text-[10px] text-[#8c909f]">Forecast Upside</div>
-                </div>
-              </div>
+                <div className={`${MONO} shrink-0 text-[17px] font-bold tabular-nums text-[color:var(--c)]`}>{formatPercent(briefing.topOpportunity.forecast_30d_upside_pct, 1)}</div>
+              </li>
             ) : null}
 
             {briefing.highestVol ? (
-              <div style={cssVar(C.negative)} className="flex items-center justify-between gap-4 rounded-lg bg-[color:color-mix(in_srgb,var(--c)_6%,transparent)] px-4 py-3 ring-1 ring-inset ring-[color:color-mix(in_srgb,var(--c)_18%,transparent)]">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0 text-[color:var(--c)]" aria-hidden />
+              <li style={cssVar(C.amber)} className="flex items-center justify-between gap-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <AlertTriangle size={15} strokeWidth={1.5} className="shrink-0 text-[color:var(--c)]" aria-hidden />
                   <div className="min-w-0">
-                    <div className={`${MONO} text-[15px] font-bold text-[color:var(--c)]`}>{briefing.highestVol.symbol}</div>
-                    <div className="text-[11px] text-[#8c909f]">Volatility Peak</div>
+                    <div className={`${MONO} text-[15px] font-bold text-[#e2e2e2]`}>{briefing.highestVol.symbol}</div>
+                    <div className="text-xs text-[#8c909f]">Highest annualized volatility</div>
                   </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  <div className={`${MONO} text-[16px] font-bold tabular-nums text-[color:var(--c)]`}>
-                    {Number.isFinite(briefing.highestVol.annualized_volatility_pct)
-                      ? `${briefing.highestVol.annualized_volatility_pct.toFixed(1)}%`
-                      : 'n/a'}
-                  </div>
-                  <div className="text-[10px] text-[#8c909f]">Risk Index</div>
+                <div className={`${MONO} shrink-0 text-[17px] font-bold tabular-nums text-[color:var(--c)]`}>
+                  {Number.isFinite(briefing.highestVol.annualized_volatility_pct)
+                    ? `${briefing.highestVol.annualized_volatility_pct.toFixed(1)}%`
+                    : 'n/a'}
                 </div>
-              </div>
+              </li>
             ) : null}
-          </div>
+          </ul>
         </div>
 
         {/* Sector tracker */}
         <div className="min-w-0 lg:col-span-4 lg:border-l lg:border-white/[0.08] lg:pl-12">
-          <PanelLabel>Sector tracker</PanelLabel>
+          <PanelLabel>Top sectors by 30-day forecast upside</PanelLabel>
           <div className="flex flex-col gap-2">
             {briefing.topSectors.length > 0 ? briefing.topSectors.map((s, i) => {
               const upside = s.avg_forecast_30d_upside_pct
@@ -210,7 +204,7 @@ export default function DailyBriefing({
                   <>, led by <span className={`${MONO} font-bold text-[#e2e2e2]`}>{briefing.watchlistNote.leaderSymbol}</span></>
                 )}
               </p>
-              <button type="button" onClick={onNavigateToWatchlist} className={outlineBtn}>View {LIST_NAME} →</button>
+              <button type="button" onClick={onNavigateToWatchlist} className={linkBtn}>View {LIST_NAME} →</button>
             </>
           ) : (
             <>
@@ -218,8 +212,8 @@ export default function DailyBriefing({
                 <BookmarkPlus size={18} strokeWidth={1.5} className="text-[#adc6ff]" aria-hidden />
                 Build {LIST_NAME === 'Portfolio' ? 'a Portfolio' : 'Watchlist'}
               </h3>
-              <p className="mb-5 max-w-[26ch] text-[13px] leading-normal text-[#8c909f]">Monitor specific tickers with personalised briefing summaries.</p>
-              <button type="button" onClick={onNavigateToWatchlist} className={outlineBtn}>Configure Symbols</button>
+              <p className="mb-4 max-w-[28ch] text-[13px] leading-normal text-[#8c909f]">Save stocks to see their average forecast here and check how risky they are together.</p>
+              <button type="button" onClick={onNavigateToWatchlist} className={linkBtn}>Add stocks →</button>
             </>
           )}
         </div>
