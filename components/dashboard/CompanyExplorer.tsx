@@ -4,7 +4,7 @@ import { LIST_NAME_LOWER } from '@/lib/riskLab'
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Search, GitBranch, Bot, RotateCcw, Bookmark } from 'lucide-react'
 import type { CompanySummary } from '@/lib/types'
-import { formatCurrency, getSignalColor } from '@/lib/formatters'
+import { formatCurrency } from '@/lib/formatters'
 
 interface Props {
   companies: CompanySummary[]
@@ -320,11 +320,11 @@ export default function CompanyExplorer({
                 <div className="flex flex-wrap items-center gap-2.5">
                   <input type="number" inputMode="decimal" aria-label="Minimum upside percent" placeholder="Min" value={upsideMinInput}
                     onChange={e => setUpsideMinInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
-                    className={`${FIELD} !w-24 text-center ${MONO}`} />
+                    className={`${FIELD} !w-24 text-center ${MONO} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`} />
                   <span className="text-sm text-[#8c909f]">to</span>
                   <input type="number" inputMode="decimal" aria-label="Maximum upside percent" placeholder="Max" value={upsideMaxInput}
                     onChange={e => setUpsideMaxInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyUpside()}
-                    className={`${FIELD} !w-24 text-center ${MONO}`} />
+                    className={`${FIELD} !w-24 text-center ${MONO} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`} />
                   <button type="button" onClick={applyUpside}
                     className={`min-h-11 rounded-lg bg-[#adc6ff] px-5 text-sm font-semibold text-[#002e6a] [@media(hover:hover)]:hover:brightness-110 ${PRESS} ${FOCUS}`}>
                     Apply
