@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, type CSSProperties } from 'react'
 import {
   ComposedChart, Line, Bar, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, Cell
@@ -8,6 +8,7 @@ import {
 import { Info, AlertTriangle, ZoomIn, RefreshCw, RotateCcw, Download } from 'lucide-react'
 import type { CompanySummary, ActualVsPredicted, FutureForecast } from '@/lib/types'
 import { formatCurrency } from '@/lib/formatters'
+import SlidingSegmented from '@/components/ui/SlidingSegmented'
 
 interface Props {
   companies: CompanySummary[]
@@ -55,6 +56,25 @@ const D = {
   mono: 'JetBrains Mono, monospace',
   body: 'Inter, system-ui, sans-serif',
 }
+
+// Glass texture shared with the other revamped tabs. The vars let reduced-transparency
+// users get a solid surface (see globals.css).
+const GLASS_CARD: CSSProperties = {
+  background: 'var(--glass-bg, rgba(255,255,255,0.04))',
+  backdropFilter: 'var(--glass-blur, blur(24px))', WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
+  border: `1px solid ${D.border}`,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 22px 44px -28px rgba(4,8,9,0.95)',
+  borderRadius: 20,
+}
+// Popovers and tooltips sit over charts, so they use a denser glass to stay readable.
+const GLASS_POP: CSSProperties = {
+  background: 'var(--glass-pop-bg, rgba(30,32,32,0.78))',
+  backdropFilter: 'var(--glass-blur, blur(24px))', WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
+  border: `1px solid ${D.border}`,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)',
+  borderRadius: 12,
+}
+const RISE = 'animate-[ui-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
 
 export default function ForecastPerformance({ companies, actualVsPredicted, futureForecast, defaultSymbol }: Props) {
   const symbols = useMemo(() => Array.from(new Set(
@@ -248,7 +268,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
     const nonOverlapping = recentHistory.filter(r => !fcastDates.has(r.date))
     return nonOverlapping[nonOverlapping.length - 1]?.date ?? recentHistory[recentHistory.length - 1]?.date
   }, [recentHistory, ffData])
-  const card = { background: D.card, border: `1px solid ${D.border}`, borderRadius: 8 }
+  const card = GLASS_CARD
 
   const filteredSymbols = symbols.filter(s => s.toLowerCase().includes(symbolSearch.toLowerCase()))
 
@@ -270,10 +290,12 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
       {/* ── Header + company selector ─────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 32, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.2, color: D.text, fontFamily: D.body, marginBottom: 8 }}>
-            Forecast <span style={{ color: '#adc6ff' }}>Performance</span>
+          <p className={`${RISE} text-sm text-[#8c909f]`} style={{ fontFamily: D.body }}>Model back-test</p>
+          <h1 className={`${RISE} mt-4 text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-[#e2e2e2] [animation-delay:60ms] [text-wrap:balance]`} style={{ fontFamily: D.body }}>
+            Forecast{' '}
+            <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text pb-1 text-transparent">Performance</span>
           </h1>
-          <p style={{ fontSize: 15, color: D.textMuted, lineHeight: 1.6 }}>
+          <p className={`${RISE} mt-5 max-w-[52ch] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty]`} style={{ fontFamily: D.body }}>
             Model back-test performance and 30-day forward projections, single company view
           </p>
         </div>
@@ -281,7 +303,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
         {/* Company selector — Stitch style dropdown */}
         <div ref={dropdownRef} style={{ position: 'relative', minWidth: 260 }}>
           <button onClick={() => setDropdownOpen(v => !v)}
-            style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', width: '100%', border: `1px solid ${dropdownOpen ? C.adaptive.stroke : D.border}` }}>
+            style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', width: '100%', borderRadius: 12, border: `1px solid ${dropdownOpen ? C.adaptive.stroke : D.border}` }}>
             <div style={{ flex: 1, textAlign: 'left' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: D.text, fontFamily: D.mono }}>{selectedSymbol || 'n/a'}</span>
@@ -290,7 +312,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
               {company && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   <span style={{ fontSize: 11, color: D.textMuted, fontFamily: D.mono }}>{company.sector}</span>
-                  <span style={{ fontSize: 11, color: company.best_model_mape < 2 ? '#4edea3' : company.best_model_mape < 5 ? '#fb923c' : '#f87171', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 3, fontFamily: D.mono }}>
+                  <span style={{ fontSize: 11, color: company.best_model_mape < 2 ? '#4edea3' : company.best_model_mape < 5 ? '#fb923c' : '#f87171', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 6, fontFamily: D.mono }}>
                     MAPE: {company.best_model_mape.toFixed(2)}%
                   </span>
                 </div>
@@ -303,12 +325,12 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
           </button>
 
           {dropdownOpen && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, background: '#1e2020', border: `1px solid ${D.border}`, borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, ...GLASS_POP, overflow: 'hidden' }}>
               <div style={{ padding: '8px 8px 6px', borderBottom: `1px solid ${D.border}` }}>
                 <input type="text" placeholder="Search ticker…" value={symbolSearch}
                   onChange={e => setSymbolSearch(e.target.value)}
                   autoFocus
-                  style={{ width: '100%', background: '#282a2b', border: `1px solid ${D.border}`, borderRadius: 4, padding: '6px 10px', fontSize: 12, color: D.text, outline: 'none', fontFamily: D.mono }} />
+                  style={{ width: '100%', background: '#282a2b', border: `1px solid ${D.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, color: D.text, outline: 'none', fontFamily: D.mono }} />
               </div>
               <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                 {filteredSymbols.slice(0, 50).map(s => {
@@ -335,17 +357,14 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
           <div style={{ padding: '16px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: D.text, fontFamily: D.body }}>Actual vs. Predicted Price by Model</h3>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {PRESET_RANGES.map(p => (
-                <button key={p.label} onClick={() => { setRangeDays(p.days); setAvpZoom({ startIdx: 0, endIdx: -1 }) }}
-                  style={{ fontSize: 12, padding: '4px 10px', borderRadius: 4, border: `1px solid ${rangeDays === p.days ? C.adaptive.stroke : D.border}`, background: rangeDays === p.days ? 'rgba(173,198,255,0.12)' : 'transparent', color: rangeDays === p.days ? C.adaptive.stroke : D.textMuted, cursor: 'pointer', fontFamily: D.mono }}>
-                  {p.label}
-                </button>
-              ))}
+              <SlidingSegmented ariaLabel="Chart range" value={rangeDays} fontFamily={D.mono} fontSize={12} padX={10} minHeight={23}
+                options={PRESET_RANGES.map(p => ({ value: p.days, label: p.label }))}
+                onChange={days => { setRangeDays(days); setAvpZoom({ startIdx: 0, endIdx: -1 }) }} />
               <div style={{ width: 1, height: 16, background: D.border, marginInline: 4 }} />
-              <button onClick={handleZoomIn} style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 4, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
+              <button onClick={handleZoomIn} style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 8, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
                 <ZoomIn size={12} />
               </button>
-              <button onClick={handleZoomOut} style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 4, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
+              <button onClick={handleZoomOut} style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 8, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
                 <RefreshCw size={12} />
               </button>
             </div>
@@ -361,7 +380,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                 <Tooltip content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
                   return (
-                    <div style={{ background: '#1e2020', border: `1px solid ${D.border}`, borderRadius: 6, padding: '10px 14px', fontSize: 12, fontFamily: D.mono }}>
+                    <div style={{ ...GLASS_POP, padding: '10px 14px', fontSize: 12, fontFamily: D.mono }}>
                       <div style={{ color: D.textMuted, marginBottom: 6 }}>{label}</div>
                       {payload.filter(p => p.value != null).map(p => (
                         <div key={p.dataKey} style={{ display: 'flex', justifyContent: 'space-between', gap: 24, color: p.color as string }}>
@@ -423,7 +442,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
           </div>
 
           {/* Adaptive Momentum info card */}
-          <div style={{ ...card, padding: '14px 18px', background: '#1e2020', border: `1px solid rgba(173,198,255,0.15)` }}>
+          <div style={{ ...card, padding: '14px 18px', border: `1px solid rgba(173,198,255,0.15)` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Info size={14} style={{ color: C.adaptive.stroke, flexShrink: 0 }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: D.text, fontFamily: D.body }}>Adaptive Momentum</span>
@@ -450,21 +469,16 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* All Models / Weighted Ensemble toggle */}
-            <div style={{ display: 'flex', background: '#1e2020', border: `1px solid ${D.border}`, borderRadius: 6, padding: 3, gap: 2 }}>
-              <button onClick={() => { setEnsembleMode(false); setActiveLegendKeys(new Set()) }}
-                style={{ fontSize: 12, padding: '5px 14px', borderRadius: 4, border: `1px solid ${!ensembleMode ? D.borderV : 'transparent'}`, background: !ensembleMode ? D.card : 'transparent', color: !ensembleMode ? D.text : D.textMuted, cursor: 'pointer', fontFamily: D.body, fontWeight: !ensembleMode ? 500 : 400, transition: 'all 0.2s' }}>
-                All Models
-              </button>
-              <button onClick={() => { setEnsembleMode(true); setActiveLegendKeys(new Set()) }}
-                style={{ fontSize: 12, padding: '5px 14px', borderRadius: 4, border: `1px solid ${ensembleMode ? 'rgba(251,146,60,0.4)' : 'transparent'}`, background: ensembleMode ? 'rgba(251,146,60,0.12)' : 'transparent', color: ensembleMode ? '#fb923c' : D.textMuted, cursor: 'pointer', fontFamily: D.body, fontWeight: ensembleMode ? 500 : 400, transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fb923c', display: 'inline-block' }} />
-                Weighted Ensemble
-              </button>
-            </div>
+            <SlidingSegmented ariaLabel="Forecast view" value={ensembleMode ? 'ensemble' : 'all'} fontFamily={D.body} fontSize={12} padX={14} minHeight={29}
+              options={[
+                { value: 'all', label: 'All Models', on: D.text, pill: 'rgba(255,255,255,0.10)' },
+                { value: 'ensemble', label: <><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fb923c', display: 'inline-block' }} />Weighted Ensemble</>, on: '#fb923c', pill: 'rgba(251,146,60,0.14)' },
+              ]}
+              onChange={v => { setEnsembleMode(v === 'ensemble'); setActiveLegendKeys(new Set()) }} />
             {/* Linear trend toggle — only in all-models mode */}
             {!ensembleMode && (
               <button onClick={() => setShowLinearTrend(v => !v)}
-                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 4, border: `1px solid ${showLinearTrend ? 'rgba(208,188,255,0.35)' : D.border}`, background: showLinearTrend ? 'rgba(208,188,255,0.08)' : 'transparent', color: showLinearTrend ? '#d0bcff' : D.textMuted, cursor: 'pointer', fontFamily: D.body, display: 'flex', alignItems: 'center', gap: 6 }}>
+                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${showLinearTrend ? 'rgba(208,188,255,0.35)' : D.border}`, background: showLinearTrend ? 'rgba(208,188,255,0.08)' : 'transparent', color: showLinearTrend ? '#d0bcff' : D.textMuted, cursor: 'pointer', fontFamily: D.body, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#d0bcff', display: 'inline-block' }} />
                 {showLinearTrend ? 'Hide' : 'Show'} linear trend
               </button>
@@ -472,7 +486,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             {/* Reset legend — only in all-models mode */}
             {!ensembleMode && hasLegendFilter && (
               <button onClick={() => setActiveLegendKeys(new Set())}
-                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 4, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.08)', color: '#f87171', cursor: 'pointer', fontFamily: D.body, display: 'flex', alignItems: 'center', gap: 4 }}>
+                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.08)', color: '#f87171', cursor: 'pointer', fontFamily: D.body, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <RotateCcw size={10} /> Reset lines
               </button>
             )}
@@ -497,7 +511,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                 return (
                   <div key={key}
                     title="XGBoost data is not available for this symbol"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#424754', cursor: 'not-allowed', fontFamily: D.body, userSelect: 'none' as const }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#424754', cursor: 'not-allowed', fontFamily: D.body, userSelect: 'none' as const }}>
                     <svg width="16" height="4">
                       <line x1="0" y1="2" x2="16" y2="2" stroke="#424754" strokeWidth={1} strokeDasharray="3 2" />
                     </svg>
@@ -509,7 +523,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
               const active = !hasLegendFilter || activeLegendKeys.has(key)
               return (
                 <button key={key} onClick={() => toggleLegendKey(key)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 4, border: `1px solid ${active ? color + '35' : 'rgba(255,255,255,0.06)'}`, background: active ? color + '10' : 'transparent', color: active ? D.textSec : D.textMuted, opacity: active ? 1 : 0.4, cursor: 'pointer', fontFamily: D.body, transition: 'all 0.15s' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 8, border: `1px solid ${active ? color + '35' : 'rgba(255,255,255,0.06)'}`, background: active ? color + '10' : 'transparent', color: active ? D.textSec : D.textMuted, opacity: active ? 1 : 0.4, cursor: 'pointer', fontFamily: D.body, transition: 'all 0.15s' }}>
                   <svg width="16" height="4">
                     <line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth={wide} strokeDasharray={solid ? '' : '4 2'} />
                   </svg>
@@ -519,7 +533,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             })}
             {/* Confidence band */}
             <button onClick={() => { toggleLegendKey('forecast_upper'); toggleLegendKey('forecast_lower') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 4, border: `1px solid rgba(173,198,255,0.2)`, background: 'rgba(173,198,255,0.05)', color: D.textSec, cursor: 'pointer', fontFamily: D.body }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 8, border: `1px solid rgba(173,198,255,0.2)`, background: 'rgba(173,198,255,0.05)', color: D.textSec, cursor: 'pointer', fontFamily: D.body }}>
               <span style={{ width: 12, height: 8, background: 'rgba(173,198,255,0.25)', borderRadius: 2, display: 'inline-block' }} />
               Confidence Band
             </button>
@@ -575,10 +589,10 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                   forecast_linear_trend: 'Linear Trend',
                 }
                 return (
-                  <div style={{ background: '#1e2020', border: `1px solid ${D.border}`, borderRadius: 6, padding: '10px 14px', fontSize: 12, fontFamily: D.mono, minWidth: 180 }}>
+                  <div style={{ ...GLASS_POP, padding: '10px 14px', fontSize: 12, fontFamily: D.mono, minWidth: 180 }}>
                     <div style={{ color: D.textMuted, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                       {label}
-                      {isForecast && <span style={{ fontSize: 10, color: C.adaptive.stroke, background: 'rgba(173,198,255,0.1)', padding: '1px 5px', borderRadius: 3 }}>Forecast</span>}
+                      {isForecast && <span style={{ fontSize: 10, color: C.adaptive.stroke, background: 'rgba(173,198,255,0.1)', padding: '1px 5px', borderRadius: 6 }}>Forecast</span>}
                     </div>
                     {filtered.map(p => (
                       <div key={p.dataKey} style={{ display: 'flex', justifyContent: 'space-between', gap: 20, color: p.color as string, marginBottom: 2 }}>
@@ -632,17 +646,14 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             onChange={e => setSelectedHorizon(parseInt(e.target.value))}
             style={{ width: '100%', accentColor: C.adaptive.stroke }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            {[7, 14, 21, 30].filter(d => d <= maxHorizon).map(d => (
-              <button key={d} onClick={() => setSelectedHorizon(d)}
-                style={{ fontSize: 11, padding: '3px 10px', borderRadius: 3, border: `1px solid ${selectedHorizon === d ? C.adaptive.stroke : D.border}`, background: selectedHorizon === d ? 'rgba(173,198,255,0.1)' : 'transparent', color: selectedHorizon === d ? C.adaptive.stroke : D.textMuted, cursor: 'pointer', fontFamily: D.mono }}>
-                {d}D
-              </button>
-            ))}
+            <SlidingSegmented ariaLabel="Forecast horizon presets" value={selectedHorizon} fontFamily={D.mono} fontSize={11} padX={10} minHeight={20}
+              options={[7, 14, 21, 30].filter(d => d <= maxHorizon).map(d => ({ value: d, label: `${d}D` }))}
+              onChange={setSelectedHorizon} />
           </div>
         </div>
         {/* Signal alert */}
         {highDivergence && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: 6, padding: '10px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: 12, padding: '10px 16px' }}>
             <AlertTriangle size={16} style={{ color: '#fb923c', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 10, fontFamily: D.mono, color: '#fb923c', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>Signal Alert</div>
@@ -654,12 +665,12 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
 
       {/* ── Row 4: Forecast Snapshot table ───────────────────────────────── */}
       {selectedRow && (
-        <div style={card}>
+        <div style={{ ...card, overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body }}>
               Forecast Snapshot: Day {selectedHorizon}
             </h3>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '5px 12px', borderRadius: 4, cursor: 'pointer', fontFamily: D.body }}>
+            <button style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: D.body }}>
               <Download size={11} /> Export Data
             </button>
           </div>
@@ -697,7 +708,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                         <ConfidenceBar mape={mape} />
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <span style={{ fontSize: 11, fontFamily: D.mono, color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}35`, padding: '3px 8px', borderRadius: 3 }}>
+                        <span style={{ fontSize: 11, fontFamily: D.mono, color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}35`, padding: '3px 8px', borderRadius: 8 }}>
                           {row.status}
                         </span>
                       </td>

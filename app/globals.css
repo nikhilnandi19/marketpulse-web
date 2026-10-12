@@ -265,3 +265,20 @@ input[type="range"]::-moz-range-thumb {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+
+/* ── Shared UI motion (sliding segmented control, tab headings) ─────────────
+   Easing: strong ease-out cubic-bezier(0.23,1,0.32,1). Press 0.97 over 160ms.
+   Hover only for real pointers. Reduced motion keeps colour fades, drops movement. */
+@keyframes ui-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.sl-seg-btn { color: var(--seg-off); transition: color .2s cubic-bezier(.23,1,.32,1), transform .16s cubic-bezier(.23,1,.32,1); }
+.sl-seg-btn[aria-pressed="true"] { color: var(--seg-on); }
+.sl-seg-btn:active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) { .sl-seg-btn[aria-pressed="false"]:hover { color: var(--seg-hover); } }
+.sl-seg-btn:focus-visible { outline: 2px solid var(--seg-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .sl-seg-btn { transition: color .2s ease; } .sl-seg-btn:active { transform: none; } }
+
+/* Solid surfaces for people who ask for reduced transparency (glass panels on revamped tabs). */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass-bg: #1e2020; --glass-pop-bg: #1e2020; --glass-blur: none; }
+}
