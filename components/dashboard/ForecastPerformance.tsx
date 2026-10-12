@@ -68,7 +68,7 @@ const GLASS_CARD: CSSProperties = {
 }
 // Popovers and tooltips sit over charts, so they use a denser glass to stay readable.
 const GLASS_POP: CSSProperties = {
-  background: 'var(--glass-pop-bg, rgba(30,32,32,0.78))',
+  background: 'var(--glass-pop-bg, rgba(30,32,32,0.88))',
   backdropFilter: 'var(--glass-blur, blur(24px))', WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
   border: `1px solid ${D.border}`,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.5)',
@@ -285,11 +285,11 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
   }
 
   return (
-    <div style={{ fontFamily: D.body }}>
+    <div className="fc-root" style={{ fontFamily: D.body }}>
 
       {/* ── Header + company selector ─────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 32, flexWrap: 'wrap' }}>
-        <div>
+        <div style={{ flex: '1 1 360px', minWidth: 0 }}>
           <p className={`${RISE} text-sm text-[#8c909f]`} style={{ fontFamily: D.body }}>Model back-test</p>
           <h1 className={`${RISE} mt-4 text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-[#e2e2e2] [animation-delay:60ms] [text-wrap:balance]`} style={{ fontFamily: D.body }}>
             Forecast{' '}
@@ -301,9 +301,9 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
         </div>
 
         {/* Company selector — Stitch style dropdown */}
-        <div ref={dropdownRef} style={{ position: 'relative', minWidth: 260 }}>
-          <button onClick={() => setDropdownOpen(v => !v)}
-            style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', width: '100%', borderRadius: 12, border: `1px solid ${dropdownOpen ? C.adaptive.stroke : D.border}` }}>
+        <div ref={dropdownRef} style={{ position: 'relative', flex: '0 0 320px', width: 320, maxWidth: '100%', marginTop: 32 }}>
+          <button onClick={() => setDropdownOpen(v => !v)} className="ui-press" aria-haspopup="listbox" aria-expanded={dropdownOpen}
+            style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', width: '100%', borderRadius: 20, border: `1px solid ${dropdownOpen ? C.adaptive.stroke : D.border}` }}>
             <div style={{ flex: 1, textAlign: 'left' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: D.text, fontFamily: D.mono }}>{selectedSymbol || 'n/a'}</span>
@@ -319,15 +319,15 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
               )}
             </div>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              style={{ color: D.textMuted, transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+              style={{ color: D.textMuted, transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s cubic-bezier(0.77, 0, 0.175, 1)', flexShrink: 0 }}>
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
 
           {dropdownOpen && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, ...GLASS_POP, overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, ...GLASS_POP, overflow: 'hidden' }} className="ui-pop">
               <div style={{ padding: '8px 8px 6px', borderBottom: `1px solid ${D.border}` }}>
-                <input type="text" placeholder="Search ticker…" value={symbolSearch}
+                <input type="text" aria-label="Search ticker" placeholder="Search ticker…" value={symbolSearch}
                   onChange={e => setSymbolSearch(e.target.value)}
                   autoFocus
                   style={{ width: '100%', background: '#282a2b', border: `1px solid ${D.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, color: D.text, outline: 'none', fontFamily: D.mono }} />
@@ -339,7 +339,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                     <button key={s} onClick={() => { setSelectedSymbol(s); setDropdownOpen(false); setSymbolSearch('') }}
                       style={{ width: '100%', textAlign: 'left', padding: '8px 14px', background: s === selectedSymbol ? 'rgba(173,198,255,0.08)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: s === selectedSymbol ? C.adaptive.stroke : D.text, fontFamily: D.mono }}>{s}</span>
-                      {c && <span style={{ fontSize: 11, color: D.textMuted, fontFamily: D.body }}>{c.sector}</span>}
+                      {c && <span style={{ fontSize: 11, color: s === selectedSymbol ? D.textSec : D.textMuted, fontFamily: D.body }}>{c.sector}</span>}
                     </button>
                   )
                 })}
@@ -355,16 +355,16 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
         {/* AVP chart */}
         <div style={card}>
           <div style={{ padding: '16px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: D.text, fontFamily: D.body }}>Actual vs. Predicted Price by Model</h3>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: D.text, fontFamily: D.body }}>Actual vs. Predicted Price by Model</h2>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <SlidingSegmented ariaLabel="Chart range" value={rangeDays} fontFamily={D.mono} fontSize={12} padX={10} minHeight={23}
                 options={PRESET_RANGES.map(p => ({ value: p.days, label: p.label }))}
                 onChange={days => { setRangeDays(days); setAvpZoom({ startIdx: 0, endIdx: -1 }) }} />
               <div style={{ width: 1, height: 16, background: D.border, marginInline: 4 }} />
-              <button onClick={handleZoomIn} style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 8, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
+              <button onClick={handleZoomIn} className="ui-press" aria-label="Zoom in on chart" title="Zoom in" style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 8, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
                 <ZoomIn size={12} />
               </button>
-              <button onClick={handleZoomOut} style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 8, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
+              <button onClick={handleZoomOut} className="ui-press" aria-label="Reset chart zoom" title="Reset zoom" style={{ padding: '4px 6px', border: `1px solid ${D.border}`, borderRadius: 8, background: 'transparent', cursor: 'pointer', color: D.textMuted }}>
                 <RefreshCw size={12} />
               </button>
             </div>
@@ -414,7 +414,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
                 {label}
               </div>
             ))}
-            <button onClick={handleZoomOut} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: D.textMuted, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: D.body }}>
+            <button onClick={handleZoomOut} className="ui-press" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: D.textMuted, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: D.body }}>
               <RefreshCw size={10} /> Reset
             </button>
           </div>
@@ -425,7 +425,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
 
           {/* Error by Model */}
           <div style={{ ...card, padding: '16px 20px', flex: 1 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body, marginBottom: 16 }}>Error by Model</h3>
+            <h2 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body, marginBottom: 16 }}>Error by Model</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {modelErrors.map(m => (
                 <div key={m.key}>
@@ -462,9 +462,9 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: D.text, fontFamily: D.body, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: D.text, fontFamily: D.body, marginBottom: 2 }}>
               Recent Price History + 30-Day Forecast Path
-            </h3>
+            </h2>
             <p style={{ fontSize: 12, color: D.textMuted }}>Last 60 trading days of actual price, then 30-day forward projections</p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -477,7 +477,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
               onChange={v => { setEnsembleMode(v === 'ensemble'); setActiveLegendKeys(new Set()) }} />
             {/* Linear trend toggle — only in all-models mode */}
             {!ensembleMode && (
-              <button onClick={() => setShowLinearTrend(v => !v)}
+              <button onClick={() => setShowLinearTrend(v => !v)} className="ui-fade ui-press" aria-pressed={showLinearTrend}
                 style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: `1px solid ${showLinearTrend ? 'rgba(208,188,255,0.35)' : D.border}`, background: showLinearTrend ? 'rgba(208,188,255,0.08)' : 'transparent', color: showLinearTrend ? '#d0bcff' : D.textMuted, cursor: 'pointer', fontFamily: D.body, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#d0bcff', display: 'inline-block' }} />
                 {showLinearTrend ? 'Hide' : 'Show'} linear trend
@@ -485,7 +485,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             )}
             {/* Reset legend — only in all-models mode */}
             {!ensembleMode && hasLegendFilter && (
-              <button onClick={() => setActiveLegendKeys(new Set())}
+              <button onClick={() => setActiveLegendKeys(new Set())} className="ui-fade ui-press"
                 style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.08)', color: '#f87171', cursor: 'pointer', fontFamily: D.body, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <RotateCcw size={10} /> Reset lines
               </button>
@@ -495,7 +495,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
 
         {/* Interactive legend — hidden in ensemble mode */}
         {!ensembleMode && (
-          <div style={{ padding: '12px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="ui-fade" style={{ padding: '12px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[
               { key: 'actual_price', label: 'Actual Price', color: C.actual.stroke, solid: true, wide: 2.5 },
               { key: 'latest_close_line', label: 'Latest Close', color: C.close.stroke, solid: false, wide: 1 },
@@ -522,8 +522,8 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
               }
               const active = !hasLegendFilter || activeLegendKeys.has(key)
               return (
-                <button key={key} onClick={() => toggleLegendKey(key)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 8, border: `1px solid ${active ? color + '35' : 'rgba(255,255,255,0.06)'}`, background: active ? color + '10' : 'transparent', color: active ? D.textSec : D.textMuted, opacity: active ? 1 : 0.4, cursor: 'pointer', fontFamily: D.body, transition: 'all 0.15s' }}>
+                <button key={key} onClick={() => toggleLegendKey(key)} className="ui-press" aria-pressed={active}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 8, border: `1px solid ${active ? color + '35' : 'rgba(255,255,255,0.06)'}`, background: active ? color + '10' : 'transparent', color: active ? D.textSec : D.textMuted, opacity: active ? 1 : 0.4, cursor: 'pointer', fontFamily: D.body, transition: 'opacity 0.15s, background-color 0.15s, border-color 0.15s, color 0.15s, transform 160ms cubic-bezier(0.23, 1, 0.32, 1)' }}>
                   <svg width="16" height="4">
                     <line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth={wide} strokeDasharray={solid ? '' : '4 2'} />
                   </svg>
@@ -532,7 +532,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
               )
             })}
             {/* Confidence band */}
-            <button onClick={() => { toggleLegendKey('forecast_upper'); toggleLegendKey('forecast_lower') }}
+            <button onClick={() => { toggleLegendKey('forecast_upper'); toggleLegendKey('forecast_lower') }} className="ui-press" aria-pressed={isVisible('forecast_upper')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 8, border: `1px solid rgba(173,198,255,0.2)`, background: 'rgba(173,198,255,0.05)', color: D.textSec, cursor: 'pointer', fontFamily: D.body }}>
               <span style={{ width: 12, height: 8, background: 'rgba(173,198,255,0.25)', borderRadius: 2, display: 'inline-block' }} />
               Confidence Band
@@ -542,7 +542,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
 
         {/* Ensemble mode legend */}
         {ensembleMode && (
-          <div style={{ padding: '12px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="ui-fade" style={{ padding: '12px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: D.textSec, fontFamily: D.body }}>
               <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke={C.ensemble.stroke} strokeWidth={2.5} /></svg>
               Weighted Ensemble
@@ -633,7 +633,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
       {/* ── Row 3: Forecast Horizon slider ───────────────────────────────── */}
       <div style={{ ...card, padding: '16px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap' }}>
         <div>
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body, marginBottom: 2 }}>Forecast Horizon</h3>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body, marginBottom: 2 }}>Forecast Horizon</h2>
           <p style={{ fontSize: 12, color: D.textMuted }}>Projecting path density for 1 to {maxHorizon} days</p>
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -642,7 +642,7 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
             <span style={{ color: C.adaptive.stroke, fontWeight: 600 }}>Day {selectedHorizon} (Selected)</span>
             <span>Day {maxHorizon}</span>
           </div>
-          <input type="range" min={1} max={maxHorizon} value={selectedHorizon}
+          <input type="range" aria-label="Forecast horizon in days" aria-valuetext={`Day ${selectedHorizon}`} min={1} max={maxHorizon} value={selectedHorizon}
             onChange={e => setSelectedHorizon(parseInt(e.target.value))}
             style={{ width: '100%', accentColor: C.adaptive.stroke }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -667,10 +667,10 @@ export default function ForecastPerformance({ companies, actualVsPredicted, futu
       {selectedRow && (
         <div style={{ ...card, overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${D.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body }}>
+            <h2 style={{ fontSize: 15, fontWeight: 600, color: D.text, fontFamily: D.body }}>
               Forecast Snapshot: Day {selectedHorizon}
-            </h3>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: D.body }}>
+            </h2>
+            <button className="ui-press" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: D.textMuted, background: 'transparent', border: `1px solid ${D.border}`, padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: D.body }}>
               <Download size={11} /> Export Data
             </button>
           </div>
