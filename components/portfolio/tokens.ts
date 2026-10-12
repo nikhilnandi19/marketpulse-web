@@ -43,7 +43,7 @@ export function glass(extra: CSSProperties = {}): CSSProperties {
 }
 
 export const labelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   fontFamily: S.mono,
   color: S.textMuted,
   letterSpacing: '0.1em',

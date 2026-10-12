@@ -31,8 +31,8 @@ export default function CorrelationHeatmap({ symbols, corr, sectorOf, hovered, o
   const [pair, setPair] = useState<{ a: string; b: string; v: number } | null>(null)
   const grid = useRef<HTMLDivElement>(null)
 
-  const size = n > 16 ? 34 : n > 10 ? 42 : 52
-  const font = n > 16 ? 9 : 11
+  const size = n > 16 ? 40 : n > 10 ? 42 : 52
+  const font = 11
 
   const move = (r: number, c: number, dr: number, dc: number) => {
     const nr = Math.max(0, Math.min(n - 1, r + dr))
@@ -54,14 +54,14 @@ export default function CorrelationHeatmap({ symbols, corr, sectorOf, hovered, o
           <div role="row" style={{ display: 'contents' }}>
             <div role="columnheader"><span style={SR_ONLY}>Stock</span></div>
             {order.map(ci => (
-              <div key={`h${ci}`} role="columnheader" style={{ ...labelStyle, fontSize: 9, textAlign: 'center', paddingBottom: 4, color: hovered === symbols[ci] ? S.primary : S.textMuted, fontWeight: hovered === symbols[ci] ? 700 : 400 }}>
+              <div key={`h${ci}`} role="columnheader" style={{ ...labelStyle, fontSize: 11, letterSpacing: '0.04em', textAlign: 'center', paddingBottom: 4, color: hovered === symbols[ci] ? S.primary : S.textMuted, fontWeight: hovered === symbols[ci] ? 700 : 400 }}>
                 {symbols[ci]}
               </div>
             ))}
           </div>
           {order.map((ri, r) => (
             <div key={`r${ri}`} role="row" style={{ display: 'contents' }}>
-              <div role="rowheader" style={{ ...labelStyle, fontSize: 10, display: 'flex', alignItems: 'center', color: hovered === symbols[ri] ? S.primary : S.textSecondary, fontWeight: hovered === symbols[ri] ? 700 : 400 }}>{symbols[ri]}</div>
+              <div role="rowheader" style={{ ...labelStyle, fontSize: 11, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', color: hovered === symbols[ri] ? S.primary : S.textSecondary, fontWeight: hovered === symbols[ri] ? 700 : 400 }}>{symbols[ri]}</div>
               {order.map((ci, c) => {
                 const v = corr[ri][ci]
                 const text = Number.isFinite(v) ? v.toFixed(2) : 'n/a'
@@ -86,7 +86,7 @@ export default function CorrelationHeatmap({ symbols, corr, sectorOf, hovered, o
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: S.mono, fontSize: 10, color: S.textMuted }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: S.mono, fontSize: 11, color: S.textMuted }}>
           <span>-1</span>
           <div aria-hidden style={{ width: 120, height: 8, borderRadius: 4, background: 'linear-gradient(90deg, rgba(80,150,230,0.85), rgba(255,255,255,0.06), rgba(240,140,50,0.85))' }} />
           <span>+1</span>

@@ -74,7 +74,7 @@ function Card({ label, value, sub, explain, badge }: { label: string; value: str
     <div style={glass({ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 6 })} title={explain}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <span style={labelStyle}>{label}</span>
-        {badge && <span style={{ fontSize: 10, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: R.min, padding: '1px 8px' }}>{badge}</span>}
+        {badge && <span style={{ fontSize: 11, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: R.min, padding: '1px 8px' }}>{badge}</span>}
       </div>
       <div style={{ fontSize: 26, fontWeight: 700, color: S.textPrimary, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, fontFamily: S.mono, color: S.textSecondary }}>{sub}</div>}

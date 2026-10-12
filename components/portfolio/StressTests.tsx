@@ -35,7 +35,7 @@ function ScenarioCard({ r, size }: { r: ScenarioResult; size: number }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: S.textPrimary }}>{r.name}</div>
           {r.status === 'partial' && (
-            <span style={{ fontSize: 10, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: R.min, padding: '1px 8px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: R.min, padding: '1px 8px', whiteSpace: 'nowrap' }}>
               Partial · {fmtPct(r.coverage, 0)} covered
             </span>
           )}
@@ -142,7 +142,7 @@ export default function StressTests({ scenarios, m, sectorOf, size, windowLabel 
                 aria-valuetext={`SPY falls ${Math.abs(shock)} percent`} style={{ flex: '1 1 160px', minHeight: 44, accentColor: S.primary }} />
               <span style={{ fontFamily: S.mono, fontSize: 15, fontWeight: 700, color: S.negative, width: 48 }}>{shock}%</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: S.mono, fontSize: 10, color: S.textMuted, margin: '-4px 0 12px', padding: '0 62px 0 52px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: S.mono, fontSize: 11, color: S.textMuted, margin: '-4px 0 12px', padding: '0 62px 0 52px' }}>
               <span>-30</span><span>-20</span><span>-10</span><span>-5</span>
             </div>
             {ms ? (

@@ -71,7 +71,7 @@ export default function ForecastRisk({ m, byTicker }: { m: Metrics; byTicker: Re
   const pad = Math.max(1, (Math.max(0, ...ys) - Math.min(0, ...ys)) * 0.12)
   const yMin = Math.floor((Math.min(0, ...ys) - pad) / 5) * 5
   const yMax = Math.ceil((Math.max(0, ...ys, summary.weightedUpsidePct) + pad) / 5) * 5
-  const qLabel = (value: string, position: 'insideTopLeft' | 'insideTopRight' | 'insideBottomLeft' | 'insideBottomRight') => ({ value, position, fill: S.textMuted, fontSize: 10, fontFamily: S.mono })
+  const qLabel = (value: string, position: 'insideTopLeft' | 'insideTopRight' | 'insideBottomLeft' | 'insideBottomRight') => ({ value, position, fill: S.textMuted, fontSize: 11, fontFamily: S.mono })
   const hotCorner = summary.points.filter(p => p.quadrant === 'high_risk_down').map(p => p.symbol)
 
   return (
@@ -104,7 +104,7 @@ export default function ForecastRisk({ m, byTicker }: { m: Metrics; byTicker: Re
             <ZAxis type="number" dataKey="z" range={[90, 700]} />
             <ReferenceLine x={split} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 3" />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.25)" />
-            <ReferenceLine y={summary.weightedUpsidePct} stroke={S.primary} strokeDasharray="6 4" label={{ value: `Portfolio ${signed(summary.weightedUpsidePct)}`, position: 'right', fill: S.primary, fontSize: 10, fontFamily: S.mono }} />
+            <ReferenceLine y={summary.weightedUpsidePct} stroke={S.primary} strokeDasharray="6 4" label={{ value: `Portfolio ${signed(summary.weightedUpsidePct)}`, position: 'right', fill: S.primary, fontSize: 11, fontFamily: S.mono }} />
             <Tooltip content={<Tip />} cursor={false} />
             <Scatter data={dots} shape={<Bubble />} isAnimationActive={false} />
           </ScatterChart>
