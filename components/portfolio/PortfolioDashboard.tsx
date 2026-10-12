@@ -7,6 +7,7 @@ import type { CompanySummary } from '@/lib/types'
 import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, SCENARIOS, WINDOWS, computeFlags, decodeShare, encodeShare, metricsCsv, type SharedPortfolio, type WindowKey } from '@/lib/risk'
 import { usePortfolio, type Confidence } from '@/lib/usePortfolio'
 import { S, R, inset, glass, fmtPct, fmtDate, fmtMoney, pctColor, labelStyle } from './tokens'
+import SegmentedControl, { SEG_CSS } from './SegmentedControl'
 import RiskContribution, { type ContributionMode } from './RiskContribution'
 import CorrelationHeatmap from './CorrelationHeatmap'
 import Diversification from './Diversification'
@@ -34,7 +35,7 @@ const PF_CSS = `
 @keyframes pf-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @media (max-width: 720px) { .pf-tap { min-height: 44px !important; min-width: 44px !important; } }
 @media (prefers-reduced-transparency: reduce) { .pf-root { --pf-glass-bg: #1e2020; --pf-glass-blur: none; } }
-`
+${SEG_CSS}`
 const RISE = 'animate-[pf-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
 
 /** Same heading as the Learn, Overview and Explorer tabs. */
@@ -61,20 +62,9 @@ function Segmented<T extends string | number>({ label, value, options, onChange 
   onChange: (v: T) => void
 }) {
   return (
-    <div role="group" aria-label={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={labelStyle}>{label}</span>
-      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: R.control, padding: 3 }}>
-        {options.map(o => {
-          const on = o.value === value
-          return (
-            <button className="pf-tap" key={String(o.value)} aria-pressed={on} onClick={() => onChange(o.value)}
-              style={{ minHeight: 32, minWidth: 44, padding: '0 12px', borderRadius: inset(R.control, 3), border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600,
-                background: on ? `${S.primary}26` : 'transparent', color: on ? S.primary : S.textMuted }}>
-              {o.text}
-            </button>
-          )
-        })}
-      </div>
+      <SegmentedControl ariaLabel={label} value={value} options={options} onChange={onChange} />
     </div>
   )
 }

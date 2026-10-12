@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { marketShock, reverseStress, sectorShock, SCENARIOS, type Metrics, type ScenarioResult } from '@/lib/risk'
-import { S, R, inset, glass, labelStyle, fmtPct, fmtDate, fmtMoney, pctColor } from './tokens'
+import { S, R, glass, labelStyle, fmtPct, fmtDate, fmtMoney, pctColor } from './tokens'
+import SegmentedControl from './SegmentedControl'
 
 interface Props {
   scenarios: ScenarioResult[]
@@ -165,12 +166,7 @@ export default function StressTests({ scenarios, m, sectorOf, size, windowLabel 
             <div style={{ borderTop: `1px solid ${S.divider}`, marginTop: 18, paddingTop: 16 }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={labelStyle}>Reverse stress</span>
-                {[-10, -20, -30].map(t => (
-                  <button className="pf-tap" key={t} aria-pressed={target === t} onClick={() => setTarget(t)}
-                    style={{ minHeight: 36, minWidth: 52, borderRadius: R.control, border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: target === t ? `${S.primary}26` : 'transparent', color: target === t ? S.primary : S.textMuted }}>
-                    {t}%
-                  </button>
-                ))}
+                <SegmentedControl ariaLabel="Market fall" value={target} onChange={setTarget} minWidth={52} options={[-10, -20, -30].map(t => ({ value: t, text: `${t}%` }))} />
               </div>
               <p style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.6, margin: '10px 0 0' }}>
                 {rev !== null
@@ -189,12 +185,7 @@ export default function StressTests({ scenarios, m, sectorOf, size, windowLabel 
                     style={{ minHeight: 40, fontFamily: S.body, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, padding: '0 10px' }}>
                     {sectors.map(s => <option key={s} value={s} style={{ background: '#201f26' }}>{s}</option>)}
                   </select>
-                  {[-10, -20, -30].map(t => (
-                    <button className="pf-tap" key={t} aria-pressed={sectorPct === t} onClick={() => setSectorPct(t)}
-                      style={{ minHeight: 36, minWidth: 52, borderRadius: R.control, border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: sectorPct === t ? `${S.primary}26` : 'transparent', color: sectorPct === t ? S.primary : S.textMuted }}>
-                      {t}%
-                    </button>
-                  ))}
+                  <SegmentedControl ariaLabel="Sector fall" value={sectorPct} onChange={setSectorPct} minWidth={52} options={[-10, -20, -30].map(t => ({ value: t, text: `${t}%` }))} />
                 </div>
                 {ss && (
                   <div style={{ fontSize: 14, color: S.textSecondary, lineHeight: 1.7, marginTop: 14 }}>

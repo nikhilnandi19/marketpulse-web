@@ -1,7 +1,8 @@
 'use client'
 
 import type { HoldingMetrics } from '@/lib/risk'
-import { S, R, inset, glass, labelStyle, fmtPct } from './tokens'
+import { S, glass, labelStyle, fmtPct } from './tokens'
+import SegmentedControl from './SegmentedControl'
 
 export type ContributionMode = 'vol' | 'tail'
 
@@ -33,14 +34,8 @@ export default function RiskContribution({ holdings, mode, onMode, tailCount, co
             A stock's share of risk is its weight times its volatility times how closely it moves with the rest of the portfolio.
           </div>
         </div>
-        <div role="group" aria-label="Risk measure" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: R.control, padding: 3 }}>
-          {([['vol', 'Volatility'], ['tail', 'Bad days']] as const).map(([v, t]) => (
-            <button className="pf-tap" key={v} aria-pressed={mode === v} onClick={() => onMode(v)}
-              style={{ minHeight: 32, padding: '0 14px', borderRadius: inset(R.control, 3), border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: mode === v ? `${S.primary}26` : 'transparent', color: mode === v ? S.primary : S.textMuted }}>
-              {t}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl ariaLabel="Risk measure" value={mode} onChange={onMode} padX={14}
+          options={[{ value: 'vol' as ContributionMode, text: 'Volatility' }, { value: 'tail' as ContributionMode, text: 'Bad days' }]} />
       </div>
 
       <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: S.mono, margin: '14px 0 10px', color: S.textMuted }}>

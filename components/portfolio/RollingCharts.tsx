@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { shadedPeriods, type GrowthPaths, type Metrics } from '@/lib/risk'
-import { S, R, inset, glass, fmtDate, fmtPct } from './tokens'
+import { S, R, glass, fmtDate, fmtPct } from './tokens'
+import SegmentedControl from './SegmentedControl'
 
 const tick = { fill: S.textMuted, fontSize: 11, fontFamily: S.mono }
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -64,14 +65,8 @@ export function RollingVolChart({ m }: { m: Metrics }) {
     <div style={glass({ padding: '22px 24px' })}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: S.textPrimary }}>Rolling volatility</div>
-        <div role="group" aria-label="Rolling window" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: R.control, padding: 3 }}>
-          {([21, 63] as const).map(w => (
-            <button className="pf-tap" key={w} aria-pressed={win === w} onClick={() => setWin(w)}
-              style={{ minHeight: 32, minWidth: 52, borderRadius: inset(R.control, 3), border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: win === w ? `${S.primary}26` : 'transparent', color: win === w ? S.primary : S.textMuted }}>
-              {w}-day
-            </button>
-          ))}
-        </div>
+        <SegmentedControl ariaLabel="Rolling window" value={win} onChange={setWin} minWidth={52} padX={14}
+          options={[{ value: 21 as 21 | 63, text: '21-day' }, { value: 63 as 21 | 63, text: '63-day' }]} />
       </div>
       <div style={{ fontSize: 12, color: S.textMuted, margin: '2px 0 8px', lineHeight: 1.5 }}>Annualized volatility over the last {win} trading days, portfolio against SPY.</div>
       <div style={{ display: 'flex', gap: 16, fontSize: 12, fontFamily: S.mono, marginBottom: 6 }}>
