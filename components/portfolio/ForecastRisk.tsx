@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { CartesianGrid, ReferenceArea, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
 import { forecastRiskSummary, type ForecastRiskPoint, type Metrics, type Reliability } from '@/lib/risk'
 import type { CompanySummary } from '@/lib/types'
-import { S, glass, labelStyle, fmtPct } from './tokens'
+import { S, R, inset, glass, labelStyle, fmtPct } from './tokens'
 
 const STROKE: Record<Reliability, { color: string; dash?: string; width: number; text: string }> = {
   strong: { color: S.positive, width: 2.5, text: 'Strong (error under 2%)' },
@@ -34,7 +34,7 @@ function Tip({ active, payload }: { active?: boolean; payload?: { payload: Dot }
   if (!active || !payload?.length) return null
   const p = payload[0].payload.p
   return (
-    <div style={{ ...glass({ padding: '8px 12px', borderRadius: 10 }), fontSize: 12, fontFamily: S.mono, color: S.textPrimary }}>
+    <div style={{ ...glass({ padding: '8px 12px', borderRadius: R.control }), fontSize: 12, fontFamily: S.mono, color: S.textPrimary }}>
       <div style={{ fontWeight: 700 }}>{p.symbol}</div>
       <div>Weight {fmtPct(p.weight)}</div>
       <div>Share of risk {fmtPct(p.riskShare)}</div>

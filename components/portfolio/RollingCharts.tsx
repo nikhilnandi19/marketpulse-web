@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { shadedPeriods, type GrowthPaths, type Metrics } from '@/lib/risk'
-import { S, glass, fmtDate, fmtPct } from './tokens'
+import { S, R, inset, glass, fmtDate, fmtPct } from './tokens'
 
 const tick = { fill: S.textMuted, fontSize: 11, fontFamily: S.mono }
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -13,7 +13,7 @@ const nn = (x: number) => (Number.isFinite(x) ? x : null)
 function Tip({ active, payload, label, fmt }: { active?: boolean; payload?: { name: string; value: number | null }[]; label?: string; fmt: (v: number) => string }) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ ...glass({ padding: '8px 12px', borderRadius: 10 }), fontSize: 12, fontFamily: S.mono, color: S.textPrimary }}>
+    <div style={{ ...glass({ padding: '8px 12px', borderRadius: R.control }), fontSize: 12, fontFamily: S.mono, color: S.textPrimary }}>
       <div style={{ color: S.textMuted, marginBottom: 4 }}>{label ? fmtDate(label) : ''}</div>
       {payload.map(p => <div key={p.name}>{p.name}: {p.value == null ? 'n/a' : fmt(p.value)}</div>)}
     </div>
@@ -64,10 +64,10 @@ export function RollingVolChart({ m }: { m: Metrics }) {
     <div style={glass({ padding: '22px 24px' })}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: S.textPrimary }}>Rolling volatility</div>
-        <div role="group" aria-label="Rolling window" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 9999, padding: 3 }}>
+        <div role="group" aria-label="Rolling window" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: R.control, padding: 3 }}>
           {([21, 63] as const).map(w => (
             <button className="pf-tap" key={w} aria-pressed={win === w} onClick={() => setWin(w)}
-              style={{ minHeight: 32, minWidth: 52, borderRadius: 9999, border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: win === w ? `${S.primary}26` : 'transparent', color: win === w ? S.primary : S.textMuted }}>
+              style={{ minHeight: 32, minWidth: 52, borderRadius: inset(R.control, 3), border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: win === w ? `${S.primary}26` : 'transparent', color: win === w ? S.primary : S.textMuted }}>
               {w}-day
             </button>
           ))}

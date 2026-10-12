@@ -2,9 +2,7 @@ import type { CSSProperties } from 'react'
 
 // Same Graphite Obsidian tokens as the other redesigned tabs.
 export const S = {
-  surface: 'rgba(32, 31, 38, 0.65)',
   border: 'rgba(255,255,255,0.10)',
-  borderTop: 'rgba(255,255,255,0.20)',
   divider: 'rgba(255,255,255,0.05)',
   primary: '#c6c0ff',
   bronze: '#CD7F32',
@@ -19,16 +17,27 @@ export const S = {
   body: 'Inter, sans-serif',
 }
 
+/**
+ * Corner radii follow one rule, like SwiftUI's ConcentricRectangle: a shape sitting inside
+ * another takes the outer radius minus the gap between them, never going below R.min.
+ *   panel   - glass cards and sections
+ *   control - inputs, buttons, notices, popovers, the frame of a segmented control
+ *   min     - the smallest radius, used for items nested deep inside a panel
+ */
+export const R = { panel: 20, control: 12, min: 8, cell: 6 }
+export const inset = (outer: number, gap: number) => Math.max(outer - gap, R.min)
+
+/**
+ * Glass panel, same texture as the Learn, Overview and Explorer tabs. The background and blur
+ * read CSS variables so the page can swap to a solid surface for reduced transparency.
+ */
 export function glass(extra: CSSProperties = {}): CSSProperties {
   return {
-    background: S.surface,
-    backdropFilter: 'blur(32px)',
-    WebkitBackdropFilter: 'blur(32px)',
-    border: `1px solid ${S.border}`,
-    borderTop: `1px solid ${S.borderTop}`,
-    borderLeft: `1px solid ${S.borderTop}`,
-    boxShadow: '0 40px 60px -15px rgba(0,0,0,0.5)',
-    borderRadius: 16,
+    background: 'var(--pf-glass-bg, rgba(255,255,255,0.04))',
+    backdropFilter: 'var(--pf-glass-blur, blur(24px))',
+    WebkitBackdropFilter: 'var(--pf-glass-blur, blur(24px))',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.08), 0 22px 44px -28px rgba(4,8,9,0.95)',
+    borderRadius: R.panel,
     ...extra,
   }
 }

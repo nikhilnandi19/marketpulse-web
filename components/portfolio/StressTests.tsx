@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { marketShock, reverseStress, sectorShock, SCENARIOS, type Metrics, type ScenarioResult } from '@/lib/risk'
-import { S, glass, labelStyle, fmtPct, fmtDate, fmtMoney, pctColor } from './tokens'
+import { S, R, inset, glass, labelStyle, fmtPct, fmtDate, fmtMoney, pctColor } from './tokens'
 
 interface Props {
   scenarios: ScenarioResult[]
@@ -34,7 +34,7 @@ function ScenarioCard({ r, size }: { r: ScenarioResult; size: number }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: S.textPrimary }}>{r.name}</div>
           {r.status === 'partial' && (
-            <span style={{ fontSize: 10, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: 9999, padding: '1px 8px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 10, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: R.min, padding: '1px 8px', whiteSpace: 'nowrap' }}>
               Partial · {fmtPct(r.coverage, 0)} covered
             </span>
           )}
@@ -124,7 +124,7 @@ export default function StressTests({ scenarios, m, sectorOf, size, windowLabel 
         </p>
       </div>
 
-      <div role="note" style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.6, background: `${S.warning}10`, border: `1px solid ${S.warning}30`, borderRadius: 12, padding: '10px 14px' }}>
+      <div role="note" style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.6, background: `${S.warning}10`, border: `1px solid ${S.warning}30`, borderRadius: R.control, padding: '10px 14px' }}>
         <b style={{ color: S.textPrimary }}>Survivorship bias.</b> The stocks here are today's S&P 500 members. Companies that were removed or failed since then are not included, so these replays make past sell-offs look milder than they were for someone holding the index at the time.
       </div>
 
@@ -167,7 +167,7 @@ export default function StressTests({ scenarios, m, sectorOf, size, windowLabel 
                 <span style={labelStyle}>Reverse stress</span>
                 {[-10, -20, -30].map(t => (
                   <button className="pf-tap" key={t} aria-pressed={target === t} onClick={() => setTarget(t)}
-                    style={{ minHeight: 36, minWidth: 52, borderRadius: 9999, border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: target === t ? `${S.primary}26` : 'transparent', color: target === t ? S.primary : S.textMuted }}>
+                    style={{ minHeight: 36, minWidth: 52, borderRadius: R.control, border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: target === t ? `${S.primary}26` : 'transparent', color: target === t ? S.primary : S.textMuted }}>
                     {t}%
                   </button>
                 ))}
@@ -186,12 +186,12 @@ export default function StressTests({ scenarios, m, sectorOf, size, windowLabel 
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                   <label htmlFor="sector-pick" style={labelStyle}>Sector</label>
                   <select className="pf-tap" id="sector-pick" value={activeSector} onChange={e => setSector(e.target.value)}
-                    style={{ minHeight: 40, fontFamily: S.body, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 10, padding: '0 10px' }}>
+                    style={{ minHeight: 40, fontFamily: S.body, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, padding: '0 10px' }}>
                     {sectors.map(s => <option key={s} value={s} style={{ background: '#201f26' }}>{s}</option>)}
                   </select>
                   {[-10, -20, -30].map(t => (
                     <button className="pf-tap" key={t} aria-pressed={sectorPct === t} onClick={() => setSectorPct(t)}
-                      style={{ minHeight: 36, minWidth: 52, borderRadius: 9999, border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: sectorPct === t ? `${S.primary}26` : 'transparent', color: sectorPct === t ? S.primary : S.textMuted }}>
+                      style={{ minHeight: 36, minWidth: 52, borderRadius: R.control, border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: sectorPct === t ? `${S.primary}26` : 'transparent', color: sectorPct === t ? S.primary : S.textMuted }}>
                       {t}%
                     </button>
                   ))}

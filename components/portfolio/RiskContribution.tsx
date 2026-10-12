@@ -1,7 +1,7 @@
 'use client'
 
 import type { HoldingMetrics } from '@/lib/risk'
-import { S, glass, labelStyle, fmtPct } from './tokens'
+import { S, R, inset, glass, labelStyle, fmtPct } from './tokens'
 
 export type ContributionMode = 'vol' | 'tail'
 
@@ -33,10 +33,10 @@ export default function RiskContribution({ holdings, mode, onMode, tailCount, co
             A stock's share of risk is its weight times its volatility times how closely it moves with the rest of the portfolio.
           </div>
         </div>
-        <div role="group" aria-label="Risk measure" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 9999, padding: 3 }}>
+        <div role="group" aria-label="Risk measure" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: R.control, padding: 3 }}>
           {([['vol', 'Volatility'], ['tail', 'Bad days']] as const).map(([v, t]) => (
             <button className="pf-tap" key={v} aria-pressed={mode === v} onClick={() => onMode(v)}
-              style={{ minHeight: 32, padding: '0 14px', borderRadius: 9999, border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: mode === v ? `${S.primary}26` : 'transparent', color: mode === v ? S.primary : S.textMuted }}>
+              style={{ minHeight: 32, padding: '0 14px', borderRadius: inset(R.control, 3), border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600, background: mode === v ? `${S.primary}26` : 'transparent', color: mode === v ? S.primary : S.textMuted }}>
               {t}
             </button>
           ))}

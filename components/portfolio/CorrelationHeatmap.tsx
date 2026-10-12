@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { S, glass, labelStyle } from './tokens'
+import { S, R, glass, labelStyle } from './tokens'
 
 interface Props {
   symbols: string[]
@@ -76,7 +76,7 @@ export default function CorrelationHeatmap({ symbols, corr, sectorOf, hovered, o
                       const d: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
                       if (d[e.key]) { e.preventDefault(); move(r, c, d[e.key][0], d[e.key][1]) }
                     }}
-                    style={{ height: size * 0.72, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, background: ri === ci ? 'rgba(255,255,255,0.07)' : cellColor(v), fontFamily: S.mono, fontSize: font, color: ri === ci ? S.textMuted : '#fff', outlineOffset: 1 }}>
+                    style={{ height: size * 0.72, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: R.cell, background: ri === ci ? 'rgba(255,255,255,0.07)' : cellColor(v), fontFamily: S.mono, fontSize: font, color: ri === ci ? S.textMuted : '#fff', outlineOffset: 1 }}>
                     {text}
                   </div>
                 )

@@ -6,7 +6,7 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceArea, Respons
 import type { CompanySummary } from '@/lib/types'
 import { MAX_HOLDINGS, MIN_TAIL_OBSERVATIONS, SCENARIOS, WINDOWS, computeFlags, decodeShare, encodeShare, metricsCsv, type SharedPortfolio, type WindowKey } from '@/lib/risk'
 import { usePortfolio, type Confidence } from '@/lib/usePortfolio'
-import { S, glass, fmtPct, fmtDate, fmtMoney, pctColor, labelStyle } from './tokens'
+import { S, R, inset, glass, fmtPct, fmtDate, fmtMoney, pctColor, labelStyle } from './tokens'
 import RiskContribution, { type ContributionMode } from './RiskContribution'
 import CorrelationHeatmap from './CorrelationHeatmap'
 import Diversification from './Diversification'
@@ -30,6 +30,25 @@ interface Props {
   listReady: boolean
 }
 
+const PF_CSS = `
+@keyframes pf-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (max-width: 720px) { .pf-tap { min-height: 44px !important; min-width: 44px !important; } }
+@media (prefers-reduced-transparency: reduce) { .pf-root { --pf-glass-bg: #1e2020; --pf-glass-blur: none; } }
+`
+const RISE = 'animate-[pf-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
+
+/** Same heading as the Learn, Overview and Explorer tabs. */
+function Heading({ count }: { count?: number }) {
+  return (
+    <div>
+      <p className={`${RISE} text-sm text-[#8c909f]`}>Portfolio risk{count ? ` · ${count} ${count === 1 ? 'stock' : 'stocks'}` : ''}</p>
+      <h1 className={`${RISE} mt-4 text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] [animation-delay:60ms] [text-wrap:balance]`}>
+        <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text pb-1 text-transparent">Portfolio</span>
+      </h1>
+    </div>
+  )
+}
+
 const EXAMPLE = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'JPM', 'XOM', 'JNJ']
 const WINDOW_LABEL: Record<WindowKey, string> = { '1Y': '1 year', '2Y': '2 years', '3Y': '3 years', '5Y': '5 years' }
 
@@ -44,12 +63,12 @@ function Segmented<T extends string | number>({ label, value, options, onChange 
   return (
     <div role="group" aria-label={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={labelStyle}>{label}</span>
-      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 9999, padding: 3 }}>
+      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: R.control, padding: 3 }}>
         {options.map(o => {
           const on = o.value === value
           return (
             <button className="pf-tap" key={String(o.value)} aria-pressed={on} onClick={() => onChange(o.value)}
-              style={{ minHeight: 32, minWidth: 44, padding: '0 12px', borderRadius: 9999, border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600,
+              style={{ minHeight: 32, minWidth: 44, padding: '0 12px', borderRadius: inset(R.control, 3), border: 'none', cursor: 'pointer', fontFamily: S.mono, fontSize: 12, fontWeight: 600,
                 background: on ? `${S.primary}26` : 'transparent', color: on ? S.primary : S.textMuted }}>
               {o.text}
             </button>
@@ -65,7 +84,7 @@ function Card({ label, value, sub, explain, badge }: { label: string; value: str
     <div style={glass({ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 6 })} title={explain}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <span style={labelStyle}>{label}</span>
-        {badge && <span style={{ fontSize: 10, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: 9999, padding: '1px 8px' }}>{badge}</span>}
+        {badge && <span style={{ fontSize: 10, fontFamily: S.mono, color: S.warning, background: `${S.warning}18`, border: `1px solid ${S.warning}35`, borderRadius: R.min, padding: '1px 8px' }}>{badge}</span>}
       </div>
       <div style={{ fontSize: 26, fontWeight: 700, color: S.textPrimary, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, fontFamily: S.mono, color: S.textSecondary }}>{sub}</div>}
@@ -95,7 +114,7 @@ function WeightInput({ value, onCommit, symbol }: { value: number; onCommit: (v:
           const n = parseFloat(e.target.value)
           if (Number.isFinite(n)) onCommit(n)
         }}
-        style={{ width: 64, minHeight: 36, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 8, padding: '0 8px' }}
+        style={{ width: 64, minHeight: 36, textAlign: 'right', fontFamily: S.mono, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, padding: '0 8px' }}
       />
       <span style={{ fontFamily: S.mono, fontSize: 12, color: S.textMuted }}>%</span>
     </div>
@@ -114,7 +133,7 @@ function noDataText(symbol: string, reason?: string): string {
 function Notice({ children, tone = 'info' }: { children: React.ReactNode; tone?: 'info' | 'warn' }) {
   const c = tone === 'warn' ? S.warning : S.primary
   return (
-    <div role="status" style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.55, background: `${c}10`, border: `1px solid ${c}30`, borderRadius: 12, padding: '10px 14px' }}>
+    <div role="status" style={{ fontSize: 13, color: S.textSecondary, lineHeight: 1.55, background: `${c}10`, border: `1px solid ${c}30`, borderRadius: R.control, padding: '10px 14px' }}>
       {children}
     </div>
   )
@@ -266,11 +285,10 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
   if (watchedSymbols.length === 0) {
     const available = EXAMPLE.filter(s => byTicker[s])
     return (
-      <div style={{ fontFamily: S.body, maxWidth: 560 }}>
+      <div className="pf-root" style={{ fontFamily: S.body, maxWidth: 640 }}>
         {linkNote && <div style={{ marginBottom: 16 }}><Notice tone={linkNote.tone}>{linkNote.text}</Notice></div>}
-        <div style={labelStyle}>Portfolio risk</div>
-        <h1 style={{ fontSize: 'clamp(1.6rem,4vw,2.4rem)', fontWeight: 700, color: S.textPrimary, letterSpacing: '-0.03em', margin: '10px 0 12px' }}>Portfolio</h1>
-        <p style={{ fontSize: 14, color: S.textMuted, lineHeight: 1.65, marginBottom: 24 }}>
+        <Heading />
+        <p className={`${RISE} mb-6 mt-5 max-w-[52ch] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty]`}>
           Add S&P 500 stocks to see how risky they are together, where the risk comes from, and how the mix behaved in past sell-offs. Everything is saved in this browser. No account needed.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
@@ -294,8 +312,8 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
   const gDates = a?.growth?.dates ?? []
 
   return (
-    <div style={{ fontFamily: S.body, position: 'relative' }}>
-      <style>{`@media (max-width: 720px) { .pf-tap { min-height: 44px !important; min-width: 44px !important; } }`}</style>
+    <div className="pf-root" style={{ fontFamily: S.body, position: 'relative' }}>
+      <style>{PF_CSS}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: '-12%', left: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,128,249,0.13) 0%, transparent 65%)', filter: 'blur(60px)' }} />
         <div style={{ position: 'absolute', bottom: '-12%', right: '-10%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(205,127,50,0.08) 0%, transparent 65%)', filter: 'blur(60px)' }} />
@@ -305,12 +323,8 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={labelStyle}>Portfolio risk</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', margin: '10px 0 8px' }}>
-            <h1 style={{ fontSize: 'clamp(1.6rem,4vw,2.4rem)', fontWeight: 700, color: S.textPrimary, letterSpacing: '-0.03em', lineHeight: 1.1, margin: 0 }}>Portfolio</h1>
-            <span style={{ fontSize: 13, fontWeight: 700, color: S.primary, background: `${S.primary}18`, border: `1px solid ${S.primary}35`, padding: '3px 11px', borderRadius: 9999, fontFamily: S.mono }}>{watchedSymbols.length}</span>
-          </div>
-          <p style={{ fontSize: 14, color: S.textMuted, lineHeight: 1.6, margin: 0, maxWidth: 680 }}>
+          <Heading count={watchedSymbols.length} />
+          <p className={`${RISE} mt-5 max-w-[52ch] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty]`}>
             See how risky your stocks are together. All figures are historical and educational. They describe the past, they are not a forecast, and they are not advice.
           </p>
         </div>
@@ -321,7 +335,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
         </div>
 
         {pending && (
-          <div role="alertdialog" aria-label="Shared portfolio" style={{ ...glass({ padding: '16px 20px', borderRadius: 12 }), border: `1px solid ${S.primary}40` }}>
+          <div role="alertdialog" aria-label="Shared portfolio" style={{ ...glass({ padding: '16px 20px', borderRadius: R.control }), border: `1px solid ${S.primary}40` }}>
             <div style={{ fontSize: 14, color: S.textPrimary, lineHeight: 1.6 }}>
               This link contains a portfolio of {pending.value.holdings.length} {pending.value.holdings.length === 1 ? 'stock' : 'stocks'} ({pending.value.holdings.slice(0, 8).map(h => h.symbol).join(', ')}{pending.value.holdings.length > 8 ? ', and more' : ''}). Opening it replaces your current list of {watchedSymbols.length}.
             </div>
@@ -333,7 +347,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
         )}
         {linkNote && <Notice tone={linkNote.tone}>{linkNote.text}</Notice>}
         {manualLink && (
-          <Notice>Your browser blocked copying. Copy this link by hand: <input className="pf-tap" readOnly value={manualLink} aria-label="Share link" onFocus={e => e.currentTarget.select()} style={{ width: '100%', marginTop: 6, minHeight: 36, fontFamily: S.mono, fontSize: 12, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 8, padding: '0 8px' }} /></Notice>
+          <Notice>Your browser blocked copying. Copy this link by hand: <input className="pf-tap" readOnly value={manualLink} aria-label="Share link" onFocus={e => e.currentTarget.select()} style={{ width: '100%', marginTop: 6, minHeight: 36, fontFamily: S.mono, fontSize: 12, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, padding: '0 8px' }} /></Notice>
         )}
 
         {/* Controls */}
@@ -346,7 +360,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
             <span style={labelStyle}>Size</span>
             <input className="pf-tap" aria-label="Portfolio size in dollars" inputMode="numeric" defaultValue={p.settings.size}
               onChange={e => { const n = parseFloat(e.target.value.replace(/[^0-9.]/g, '')); if (n > 0) p.setSize(n) }}
-              style={{ width: 110, minHeight: 36, fontFamily: S.mono, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 8, padding: '0 10px' }} />
+              style={{ width: 110, minHeight: 36, fontFamily: S.mono, fontSize: 13, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, padding: '0 10px' }} />
           </label>
           <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: S.mono, color: S.textMuted }}>
             {p.meta ? `Prices to ${fmtDate(p.meta.last_date)} · Method v${p.meta.methodology_version} · Benchmark SPY` : ''}
@@ -450,7 +464,8 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
         {p.dataStatus === 'loading' && !m && <div style={{ ...glass({ padding: 24 }), color: S.textMuted, fontSize: 14 }}>Loading price history...</div>}
 
         {/* Holdings */}
-        <div style={glass({ overflow: 'hidden' })}>
+        {/* No blur on this tall panel: a blur layer this large painted a dark patch over the table rows in testing, and the page behind is flat so it looks the same. */}
+        <div style={glass({ overflow: 'hidden', backdropFilter: 'none', WebkitBackdropFilter: 'none' })}>
           <div style={{ padding: '16px 24px', borderBottom: `1px solid ${S.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <span style={{ fontSize: 16, fontWeight: 600, color: S.textPrimary }}>Holdings</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -470,7 +485,7 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
                   <div><div style={labelStyle}>{label}</div><div style={{ fontFamily: S.mono, fontSize: 13, color }}>{value}</div></div>
                 )
                 return (
-                  <li key={sym} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${S.divider}`, borderRadius: 12, padding: 14 }}>
+                  <li key={sym} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${S.divider}`, borderRadius: inset(R.panel, 12), padding: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontFamily: S.mono, fontWeight: 700, color: S.textPrimary, fontSize: 15 }}>{sym}</div>
@@ -554,11 +569,11 @@ export default function PortfolioDashboard({ companies, watchedSymbols, onToggle
               <Plus size={16} color={S.textMuted} />
               <input className="pf-tap" aria-label="Add a stock by ticker or name" placeholder={atLimit ? `Limit of ${MAX_HOLDINGS} stocks reached` : 'Add stock: ticker or name'} value={query} disabled={atLimit}
                 onChange={e => setQuery(e.target.value)}
-                style={{ flex: '1 1 240px', maxWidth: 360, minHeight: 40, fontFamily: S.body, fontSize: 14, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 10, padding: '0 12px' }} />
+                style={{ flex: '1 1 240px', maxWidth: 360, minHeight: 40, fontFamily: S.body, fontSize: 14, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, padding: '0 12px' }} />
               <button className="pf-tap" onClick={onNavigateToExplorer} style={ghostBtn}>Browse Explorer</button>
             </div>
             {matches.length > 0 && (
-              <ul style={{ listStyle: 'none', margin: '8px 0 0 26px', padding: 0, maxWidth: 360, ...glass({ borderRadius: 12, overflow: 'hidden' }) }}>
+              <ul style={{ listStyle: 'none', margin: '8px 0 0 26px', padding: 0, maxWidth: 360, ...glass({ borderRadius: R.control, overflow: 'hidden' }) }}>
                 {matches.map(c => (
                   <li key={c.symbol}>
                     <button className="pf-tap" onClick={() => { onToggleWatchlist(c.symbol); setQuery('') }}
@@ -637,7 +652,7 @@ function ChartTip({ active, payload, label, kind }: { active?: boolean; payload?
     ? [['Portfolio', get('port')?.toFixed(1)], ['SPY', get('bench')?.toFixed(1)]]
     : [['Portfolio', fmtPct(get('pdd') ?? NaN)], ['SPY', fmtPct(get('bdd') ?? NaN)]]
   return (
-    <div style={{ ...glass({ padding: '8px 12px', borderRadius: 10 }), fontSize: 12, fontFamily: S.mono, color: S.textPrimary }}>
+    <div style={{ ...glass({ padding: '8px 12px', borderRadius: R.control }), fontSize: 12, fontFamily: S.mono, color: S.textPrimary }}>
       <div style={{ color: S.textMuted, marginBottom: 4 }}>{label ? fmtDate(label) : ''}</div>
       {rows.map(([k, v]) => <div key={k}>{k}: {v}</div>)}
     </div>
@@ -645,7 +660,7 @@ function ChartTip({ active, payload, label, kind }: { active?: boolean; payload?
 }
 
 const td: React.CSSProperties = { padding: '12px 16px', verticalAlign: 'middle' }
-const iconBtn: React.CSSProperties = { minWidth: 36, minHeight: 36, background: 'transparent', border: 'none', color: S.textMuted, cursor: 'pointer', borderRadius: 8 }
-const chipBtn: React.CSSProperties = { minHeight: 36, padding: '0 14px', fontSize: 12, fontWeight: 600, fontFamily: S.body, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: 9999, cursor: 'pointer' }
-const primaryBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 13, fontWeight: 600, color: S.primary, background: `${S.primary}12`, border: `1px solid ${S.primary}30`, padding: '0 22px', borderRadius: 9999, cursor: 'pointer', fontFamily: S.body }
-const ghostBtn: React.CSSProperties = { minHeight: 40, padding: '0 18px', fontSize: 13, fontWeight: 600, color: S.textSecondary, background: 'transparent', border: `1px solid ${S.border}`, borderRadius: 9999, cursor: 'pointer', fontFamily: S.body }
+const iconBtn: React.CSSProperties = { minWidth: 36, minHeight: 36, background: 'transparent', border: 'none', color: S.textMuted, cursor: 'pointer', borderRadius: R.control }
+const chipBtn: React.CSSProperties = { minHeight: 36, padding: '0 14px', fontSize: 12, fontWeight: 600, fontFamily: S.body, color: S.textPrimary, background: 'rgba(255,255,255,0.06)', border: `1px solid ${S.border}`, borderRadius: R.control, cursor: 'pointer' }
+const primaryBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 13, fontWeight: 600, color: S.primary, background: `${S.primary}12`, border: `1px solid ${S.primary}30`, padding: '0 22px', borderRadius: R.control, cursor: 'pointer', fontFamily: S.body }
+const ghostBtn: React.CSSProperties = { minHeight: 40, padding: '0 18px', fontSize: 13, fontWeight: 600, color: S.textSecondary, background: 'transparent', border: `1px solid ${S.border}`, borderRadius: R.control, cursor: 'pointer', fontFamily: S.body }
