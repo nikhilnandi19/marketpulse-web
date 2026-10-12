@@ -1,266 +1,374 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useMemo, useState, type CSSProperties } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { SectorSummary } from '@/lib/types'
+import SlidingSegmented from '@/components/ui/SlidingSegmented'
 
 interface Props {
   sectors: SectorSummary[]
-  onNavigateToExplorer?: (sector: string) => void
+  /** Opens the Explorer filtered by sector, signal, or both. */
+  onNavigateToExplorer?: (sector?: string, signal?: string) => void
 }
 
-const ALL = 'All'
+// The pipeline writes a literal "Unknown" for companies with no sector. It is shown apart from the
+// real sectors and left out of the leaders, so it never ranks like a peer.
+const UNKNOWN = 'Unknown'
 
-// Stitch exact colors from design system
-const D = {
-  bg: '#121414', card: '#1a1c1c', elevated: '#1e2020',
-  border: 'rgba(255,255,255,0.08)',
-  text: '#e2e2e2', textSec: '#c2c6d6', textMuted: '#8c909f',
-  mono: 'JetBrains Mono, monospace', body: 'Inter, system-ui, sans-serif',
+// Same signal names the Explorer filters on, same colours as the Overview tab.
+const SIGNALS = [
+  { key: 'potential_opportunity_count',       short: 'Opportunity',     explorer: 'Potential Opportunity',                  color: '#4edea3' },
+  { key: 'stable_watchlist_count',            short: 'Stable',          explorer: 'Stable Watchlist',                       color: '#adc6ff' },
+  { key: 'needs_further_review_count',        short: 'Needs review',    explorer: 'Needs Further Review',                   color: '#d0bcff' },
+  { key: 'high_volatility_speculative_count', short: 'High volatility', explorer: 'High Volatility Speculative',            color: '#F59E0B' },
+  { key: 'weak_negative_count',               short: 'Weak',            explorer: 'Weak Fundamentals / Negative Forecast',  color: '#F87171' },
+] as const
+type SignalKey = typeof SIGNALS[number]['key']
+
+const METRICS = [
+  { key: 'avg_forecast_30d_upside_pct',    short: 'Upside',      dir: 'desc', fmt: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` },
+  { key: 'avg_annualized_volatility_pct',  short: 'Volatility',  dir: 'asc',  fmt: (v: number) => `${v.toFixed(1)}%` },
+  { key: 'avg_model_mape',                 short: 'Model error', dir: 'asc',  fmt: (v: number) => `${v.toFixed(2)}%` },
+  { key: 'avg_profit_margin_pct',          short: 'Margin',      dir: 'desc', fmt: (v: number) => `${v.toFixed(1)}%` },
+] as const
+type MetricKey = typeof METRICS[number]['key']
+
+// Glass texture shared with the other revamped tabs (see globals.css for reduced transparency).
+const GLASS: CSSProperties = {
+  background: 'var(--glass-bg, rgba(255,255,255,0.04))',
+  backdropFilter: 'var(--glass-blur, blur(24px))', WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
+  border: '1px solid rgba(255,255,255,0.08)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 22px 44px -28px rgba(4,8,9,0.95)',
+  borderRadius: 20,
 }
+// Tall panels skip the blur: a blur layer that large painted a dark patch over rows in testing,
+// and the page behind is flat, so it looks the same.
+const GLASS_TALL: CSSProperties = { ...GLASS, backdropFilter: 'none', WebkitBackdropFilter: 'none' }
 
-// Signal composition colors — exact from Stitch screenshot
-const SIGNAL_KEYS = [
-  { key: 'stable_watchlist_count',            label: 'Stable Watchlist',      color: '#adc6ff' },
-  { key: 'potential_opportunity_count',       label: 'Potential Opportunity', color: '#4edea3' },
-  { key: 'needs_further_review_count',        label: 'Needs Review',          color: '#d0bcff' },
-  { key: 'high_volatility_speculative_count', label: 'High Vol Speculative',  color: '#fb923c' },
-  { key: 'weak_negative_count',               label: 'Weak Negative',         color: '#f87171' },
-]
+const RISE = 'animate-[ui-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_backwards] motion-reduce:animate-none'
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#adc6ff]'
+const MONO = "[font-family:'JetBrains_Mono',monospace]"
+const ROW_HOVER = '[@media(hover:hover)]:hover:bg-white/[0.04] has-[button:focus-visible]:bg-white/[0.06]'
+// Makes the sector name's button cover its whole row, so the row is one click target.
+const STRETCH = "after:absolute after:inset-0 after:content-['']"
 
-// 2×2 chart configs — colors match Stitch screenshot exactly
-const CHARTS = [
-  {
-    key: 'avg_forecast_30d_upside_pct',
-    label: 'AVG 30D FORECAST UPSIDE',
-    icon: '↗',
-    color: '#adc6ff',        // periwinkle blue — top left chart
-    fmt: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`,
-    bottomLeft: 'Sectors',
-    bottomRight: (data: SectorSummary[]) => {
-      if (!data.length) return ''
-      const max = data.reduce((p, c) => c.avg_forecast_30d_upside_pct > p.avg_forecast_30d_upside_pct ? c : p, data[0])
-      return `High: ${max.sector?.split(' ')[0]}`
-    },
-  },
-  {
-    key: 'avg_annualized_volatility_pct',
-    label: 'AVG ANNUALIZED VOLATILITY',
-    icon: '~',
-    color: '#d0bcff',        // lighter purple — top right chart
-    fmt: (v: number) => `${v.toFixed(1)}%`,
-    bottomLeft: 'Sectors',
-    bottomRight: (data: SectorSummary[]) => {
-      if (!data.length) return ''
-      const max = data.reduce((p, c) => c.avg_annualized_volatility_pct > p.avg_annualized_volatility_pct ? c : p, data[0])
-      return `High: ${max.sector?.split(' ')[0]}`
-    },
-  },
-  {
-    key: 'avg_model_mape',
-    label: 'AVG MODEL MAPE',
-    icon: '◎',
-    color: '#8b5cf6',        // deeper purple — bottom left chart (matches Stitch)
-    fmt: (v: number) => `${v.toFixed(2)}%`,
-    bottomLeft: 'Sectors',
-    bottomRight: () => 'Error Margin (Lower is better)',
-  },
-  {
-    key: 'avg_profit_margin_pct',
-    label: 'AVG PROFIT MARGIN',
-    icon: '▫',
-    color: '#4edea3',        // teal green — bottom right chart
-    fmt: (v: number) => `${v.toFixed(1)}%`,
-    bottomLeft: 'Sectors',
-    bottomRight: (data: SectorSummary[]) => {
-      if (!data.length) return ''
-      const valid = data.filter(d => d.avg_profit_margin_pct != null)
-      if (!valid.length) return ''
-      const max = valid.reduce((p, c) => c.avg_profit_margin_pct > p.avg_profit_margin_pct ? c : p, valid[0])
-      return `High: ${max.sector?.split(' ')[0]}`
-    },
-  },
-]
-
-const card = { background: '#1a1c1c', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
+const signed = (v: number, d = 0) => `${v >= 0 ? '+' : ''}${v.toFixed(d)}`
 
 export default function SectorComparison({ sectors, onNavigateToExplorer }: Props) {
-  const [filterSector, setFilterSector] = useState(ALL)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const reduce = useReducedMotion()
+  const [metric, setMetric] = useState<MetricKey>('avg_forecast_30d_upside_pct')
+  const [signal, setSignal] = useState<SignalKey>('potential_opportunity_count')
+  const go = (sector?: string, sig?: string) => onNavigateToExplorer?.(sector, sig)
 
-  const sectorOptions = [ALL, ...sectors.map(s => s.sector).sort()]
+  const real = useMemo(() => sectors.filter(s => s.sector !== UNKNOWN), [sectors])
+  const unknown = useMemo(() => sectors.find(s => s.sector === UNKNOWN), [sectors])
+  const totalCompanies = sum(sectors.map(s => s.number_of_companies))
+  const signalTotal = (s: SectorSummary) => sum(SIGNALS.map(g => s[g.key]))
+  const share = (s: SectorSummary, key: SignalKey) => { const t = signalTotal(s); return t ? (s[key] / t) * 100 : 0 }
 
-  const data = useMemo(() =>
-    (filterSector === ALL ? sectors : sectors.filter(s => s.sector === filterSector))
-      .sort((a, b) => a.sector.localeCompare(b.sector))
-  , [sectors, filterSector])
+  const overall = useMemo(() => {
+    const t = sum(sectors.map(signalTotal))
+    return Object.fromEntries(SIGNALS.map(g => [g.key, { count: sum(sectors.map(s => s[g.key])), pct: t ? (sum(sectors.map(s => s[g.key])) / t) * 100 : 0 }])) as Record<SignalKey, { count: number; pct: number }>
+  }, [sectors])
 
-  const handleBarClick = (chartData: any) => {
-    const sector = chartData?.activePayload?.[0]?.payload?.sector
-    if (sector && onNavigateToExplorer) onNavigateToExplorer(sector)
+  const meta = METRICS.find(m => m.key === metric)!
+  const sigMeta = SIGNALS.find(g => g.key === signal)!
+
+  // Leaders ignore the "Unknown" group.
+  const leaders = useMemo(() => {
+    if (!real.length) return []
+    const best = (key: MetricKey, dir: 'max' | 'min') => real.reduce((p, c) => (dir === 'max' ? c[key] > p[key] : c[key] < p[key]) ? c : p, real[0])
+    const up = best('avg_forecast_30d_upside_pct', 'max'), vol = best('avg_annualized_volatility_pct', 'min')
+    const err = best('avg_model_mape', 'min'), mar = best('avg_profit_margin_pct', 'max')
+    return [
+      { label: 'Highest forecast upside', s: up,  text: `${METRICS[0].fmt(up.avg_forecast_30d_upside_pct)} average`,           color: '#4edea3' },
+      { label: 'Lowest volatility',       s: vol, text: `${vol.avg_annualized_volatility_pct.toFixed(1)}% a year`,             color: '#adc6ff' },
+      { label: 'Best model fit',          s: err, text: `${err.avg_model_mape.toFixed(2)}% average error`,                    color: '#d0bcff' },
+      { label: 'Highest profit margin',   s: mar, text: `${mar.avg_profit_margin_pct.toFixed(1)}% average`,                    color: '#F59E0B' },
+    ]
+  }, [real])
+
+  // ── Scoreboard ──
+  const board = useMemo(() => [...real].sort((a, b) => (meta.dir === 'desc' ? b[metric] - a[metric] : a[metric] - b[metric])), [real, metric, meta.dir])
+  const boardAll = unknown ? [...real, unknown] : real
+  const maxOf = (key: MetricKey) => Math.max(0.0001, ...boardAll.map(s => Math.max(0, s[key])))
+  const hasRange = boardAll.every(s => s.min_forecast_30d_upside_pct != null && s.max_forecast_30d_upside_pct != null)
+  const fLo = Math.min(0, ...boardAll.map(s => s.min_forecast_30d_upside_pct ?? s.avg_forecast_30d_upside_pct)) - 1
+  const fHi = Math.max(0, ...boardAll.map(s => s.max_forecast_30d_upside_pct ?? s.avg_forecast_30d_upside_pct)) + 1
+  const fPos = (v: number) => ((v - fLo) / (fHi - fLo)) * 100
+
+  // ── Signal table: rows ordered by the chosen signal's share ──
+  const signalRows = useMemo(() => [...real].sort((a, b) => share(b, signal) - share(a, signal)), [real, signal]) // eslint-disable-line react-hooks/exhaustive-deps
+  const diffs = boardAll.map(s => share(s, signal) - overall[signal].pct)
+  const dLo = Math.min(-4, ...diffs) - 3
+  const dHi = Math.max(4, ...diffs) + 3
+  const dPos = (v: number) => ((v - dLo) / (dHi - dLo)) * 100
+
+  const springT = reduce ? { duration: 0 } : { type: 'spring' as const, duration: 0.4, bounce: 0 }
+  const scoreCtx = {
+    go, fPos, springT,
+    maxVol: maxOf('avg_annualized_volatility_pct'), maxMape: maxOf('avg_model_mape'), maxMargin: maxOf('avg_profit_margin_pct'),
+  }
+  const signalCtx = { go, springT, signal, sigMeta, overallPct: overall[signal].pct, dPos, share, signalTotal }
+
+  if (!sectors.length) {
+    return (
+      <div style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+        <div className="rounded-[20px] p-8 text-[15px] text-[#8c909f]" style={GLASS} role="status">Loading sector data…</div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ fontFamily: D.body }}>
+    <div className="font-sans text-[#e2e2e2]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
 
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.2, color: D.text, fontFamily: D.body, marginBottom: 8 }}>
-          Sector Comparison
-        </h1>
-        <p style={{ fontSize: 15, color: D.textMuted, lineHeight: 1.6 }}>
-          Aggregate metrics across S&P 500 sectors.{onNavigateToExplorer && ' Click any bar to explore that sector\'s companies.'}
-        </p>
-      </div>
-
-      {/* 2×2 chart grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {CHARTS.map(cfg => {
-          const vals = data.map(d => (d as any)[cfg.key] as number).filter(v => v != null)
-          const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
-          const maxVal = vals.length ? Math.max(...vals) : 0
-
-          return (
-            <div key={cfg.key} style={card}>
-              {/* Card header */}
-              <div style={{ padding: '18px 20px 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontFamily: D.mono, color: D.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                    {cfg.label}
-                  </span>
-                  <span style={{ fontSize: 14, color: D.textMuted }}>{cfg.icon}</span>
-                </div>
-                <div style={{ fontSize: 32, fontWeight: 600, color: cfg.color, fontFamily: D.body, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 4 }}>
-                  {cfg.fmt(avg)}
-                </div>
-              </div>
-
-              {/* Bar chart */}
-              <div style={{ padding: '8px 0 0' }}>
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart
-                    data={data}
-                    barSize={20}
-                    margin={{ top: 4, right: 16, bottom: 28, left: 16 }}
-                    onClick={handleBarClick}
-                    style={{ cursor: onNavigateToExplorer ? 'pointer' : 'default' }}>
-                    <XAxis
-                      dataKey="sector"
-                      tick={{ fill: D.textMuted, fontSize: 9, fontFamily: D.mono }}
-                      angle={-35}
-                      textAnchor="end"
-                      height={32}
-                      interval={0}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis hide />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        return (
-                          <div style={{ background: '#1e2020', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 12px', fontSize: 12, fontFamily: D.mono }}>
-                            <div style={{ color: D.textMuted, marginBottom: 4 }}>{payload[0].payload.sector}</div>
-                            <div style={{ color: cfg.color, fontWeight: 600 }}>{cfg.fmt(payload[0].value as number)}</div>
-                            {onNavigateToExplorer && <div style={{ color: D.textMuted, fontSize: 10, marginTop: 4 }}>Click to explore →</div>}
-                          </div>
-                        )
-                      }}
-                    />
-                    <Bar dataKey={cfg.key} radius={[2, 2, 0, 0]}>
-                      {data.map((d, i) => {
-                        const val = (d as any)[cfg.key] as number
-                        const isMax = val === maxVal
-                        // Stitch: highest bar full opacity, others ~40% — creates the visual hierarchy
-                        return <Cell key={i} fill={cfg.color} fillOpacity={isMax ? 0.95 : 0.35} />
-                      })}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Card footer */}
-              <div style={{ padding: '0 20px 14px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, color: D.textMuted, fontFamily: D.mono }}>{cfg.bottomLeft}</span>
-                <span style={{ fontSize: 11, color: D.textMuted, fontFamily: D.mono }}>{cfg.bottomRight(data)}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Final Signal Composition — horizontal stacked bars */}
-      <div style={card}>
-        <div style={{ padding: '20px 24px' }}>
-          {/* Header row */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 24 }}>
-            <div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, color: D.text, fontFamily: D.body, letterSpacing: '-0.02em', marginBottom: 4 }}>
-                Final Signal Composition by Sector
-              </h3>
-              <p style={{ fontSize: 13, color: D.textMuted, fontFamily: D.body, lineHeight: 1.5, maxWidth: 420 }}>
-                Weighting of predictive classifications across the S&P 500 universe.
-              </p>
-            </div>
-            {/* Legend — exact Stitch layout: colored squares + mono labels */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', alignItems: 'center' }}>
-              {SIGNAL_KEYS.map(({ label, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: color, display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontFamily: D.mono, color: D.textSec }}>{label}</span>
-                </div>
-              ))}
-            </div>
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <header className="mb-8 grid gap-x-14 gap-y-8 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <p className={`${RISE} text-sm text-[#8c909f]`}>S&P 500 sectors</p>
+          <h1 className={`${RISE} mt-4 text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-[1.02] tracking-[-0.045em] [animation-delay:60ms] [text-wrap:balance]`}>
+            Sector{' '}
+            <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text pb-1 text-transparent">Comparison</span>
+          </h1>
+          <p className={`${RISE} mt-5 max-w-[52ch] text-lg leading-relaxed text-[#8c909f] [animation-delay:120ms] [text-wrap:pretty]`}>
+            How sectors differ on forecast upside, risk, and signals. Every figure is a simple average across a sector&apos;s companies, not weighted by company size.
+          </p>
+        </div>
+        <aside aria-label="Coverage" className={`${RISE} self-start p-6 [animation-delay:200ms] sm:p-7 lg:col-span-5 lg:mt-10`} style={GLASS}>
+          <div className="text-[17px] font-medium text-[#c2c6d6]">Sectors compared</div>
+          <div className="mt-3 flex items-baseline gap-3 text-[clamp(2.75rem,6vw,4rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums">
+            <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text text-transparent">{real.length}</span>
+            <span className="text-[0.5em] font-normal text-[#8c909f]">{totalCompanies} companies</span>
           </div>
+          {unknown && (
+            <p className="mt-5 border-t border-white/[0.08] pt-4 text-[15px] leading-relaxed text-[#8c909f]">
+              {unknown.number_of_companies} companies have no sector in the data. They sit in their own group, shown apart and left out of the rankings.
+            </p>
+          )}
+        </aside>
+      </header>
 
-          {/* Stacked bar rows — sorted by total count descending */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {[...data]
-              .sort((a, b) => {
-                const ta = SIGNAL_KEYS.reduce((s, { key }) => s + ((a as any)[key] ?? 0), 0)
-                const tb = SIGNAL_KEYS.reduce((s, { key }) => s + ((b as any)[key] ?? 0), 0)
-                return tb - ta
-              })
-              .map(sector => {
-                const total = SIGNAL_KEYS.reduce((s, { key }) => s + ((sector as any)[key] ?? 0), 0)
-                if (!total) return null
-                return (
-                  <div key={sector.sector}
-                    onClick={() => onNavigateToExplorer?.(sector.sector)}
-                    style={{ cursor: onNavigateToExplorer ? 'pointer' : 'default' }}>
-                    {/* Label row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontFamily: D.mono, color: D.textSec, fontWeight: 500 }}>
-                        {sector.sector}
-                      </span>
-                      <span style={{ fontSize: 12, fontFamily: D.mono, color: D.textMuted }}>
-                        {total} Entities
-                      </span>
-                    </div>
-                    {/* Horizontal stacked bar */}
-                    <div style={{ display: 'flex', height: 28, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
-                      {SIGNAL_KEYS.map(({ key, color }) => {
-                        const count = (sector as any)[key] ?? 0
-                        const pct = total > 0 ? (count / total) * 100 : 0
-                        if (pct < 0.5) return null
-                        return (
-                          <div
-                            key={key}
-                            style={{ width: `${pct}%`, background: color, transition: 'opacity 0.15s' }}
-                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.75'}
-                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
-                            title={`${SIGNAL_KEYS.find(s => s.key === key)?.label}: ${count}`}
-                          />
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
+      {/* ── Leaders ──────────────────────────────────────────────────────── */}
+      <section aria-label="Sector leaders" className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {leaders.map(l => (
+          <button key={l.label} type="button" onClick={() => go(l.s.sector)} className={`ui-press rounded-[20px] p-5 text-left ${FOCUS}`} style={GLASS}
+            aria-label={`${l.label}: ${l.s.sector}, ${l.text}. Open in Explorer`}>
+            <div className="text-sm text-[#8c909f]">{l.label}</div>
+            <div className="mt-2 text-[22px] font-semibold leading-tight tracking-[-0.02em]">{l.s.sector}</div>
+            <div className={`${MONO} mt-1.5 text-[14px] tabular-nums`} style={{ color: l.color }}>{l.text}</div>
+          </button>
+        ))}
+      </section>
+
+      {/* ── Scoreboard ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="sc-title" className="mb-4 overflow-hidden" style={GLASS_TALL}>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 pb-4 pt-5 sm:px-6">
+          <div>
+            <h2 id="sc-title" className="text-[22px] font-semibold tracking-[-0.02em]">Sector scoreboard</h2>
+            <p className="mt-1 text-sm text-[#8c909f]">Sorted by {meta.short.toLowerCase()}, {meta.dir === 'desc' ? 'highest' : 'lowest'} first.</p>
+          </div>
+          <div className="flex max-w-full items-center gap-2.5">
+            <span className="shrink-0 text-sm text-[#8c909f]">Sort by</span>
+            <div className="-m-1 max-w-full overflow-x-auto p-1 [scrollbar-width:none]">
+              <SlidingSegmented ariaLabel="Sort sectors by" value={metric} onChange={setMetric} fontSize={13} padX={12} minHeight={30}
+                options={METRICS.map(m => ({ value: m.key, label: m.short }))} />
+            </div>
           </div>
         </div>
+
+        <div className="overflow-x-auto">
+          <div role="table" aria-label="Sectors compared on forecast, volatility, model error, and margin" className="min-w-[860px]">
+            <div role="row" className="grid grid-cols-[minmax(150px,1.1fr)_minmax(260px,2.4fr)_repeat(3,minmax(88px,1fr))] items-end gap-x-5 border-y border-white/[0.08] px-5 py-2.5 text-[12px] text-[#8c909f] sm:px-6">
+              <div role="columnheader">Sector</div>
+              <div role="columnheader">30-day forecast: range and average</div>
+              <div role="columnheader">Volatility</div>
+              <div role="columnheader">Model error</div>
+              <div role="columnheader">Profit margin</div>
+            </div>
+
+            <div role="rowgroup">
+              {board.map(s => <ScoreRow key={s.sector} s={s} {...scoreCtx} />)}
+            </div>
+            {unknown && (
+              <div role="rowgroup" className="mt-1 border-t border-dashed border-white/[0.14] pt-1">
+                <ScoreRow s={unknown} noData {...scoreCtx} />
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="px-5 pb-5 pt-3 text-[13px] leading-relaxed text-[#8c909f] sm:px-6">
+          {hasRange
+            ? 'In the forecast column the dot is the sector average, the bar runs from the lowest to the highest forecast among its companies, and the vertical line marks 0%. '
+            : 'In the forecast column the dot is the sector average and the vertical line marks 0%. '}
+          Model error is the average MAPE of each company&apos;s best model, so lower is better.
+        </p>
+      </section>
+
+      {/* ── Signal mix ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="sg-title" className="mb-4 overflow-hidden" style={GLASS_TALL}>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 pb-4 pt-5 sm:px-6">
+          <div>
+            <h2 id="sg-title" className="text-[22px] font-semibold tracking-[-0.02em]">Signal mix by sector</h2>
+            <p className="mt-1 max-w-[62ch] text-sm leading-relaxed text-[#8c909f]">
+              The heatmap shows each sector&apos;s share of companies in every signal. The chart on the right shows how far one signal sits above or below the overall mix.
+            </p>
+          </div>
+          <div className="flex max-w-full items-center gap-2.5">
+            <span className="shrink-0 text-sm text-[#8c909f]">Compare</span>
+            <div className="-m-1 max-w-full overflow-x-auto p-1 [scrollbar-width:none]">
+              <SlidingSegmented ariaLabel="Signal to compare" value={signal} onChange={setSignal} fontSize={13} padX={12} minHeight={30}
+                options={SIGNALS.map(g => ({ value: g.key, label: g.short }))} />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <div role="table" aria-label="Share of each sector's companies by final signal" className="min-w-[900px]">
+            <div role="row" className="grid grid-cols-[150px_repeat(5,minmax(70px,1fr))_minmax(260px,2.6fr)] items-end gap-x-1.5 border-y border-white/[0.08] px-5 py-2.5 text-[12px] text-[#8c909f] sm:px-6">
+              <div role="columnheader">Sector</div>
+              {SIGNALS.map(g => (
+                <div role="columnheader" key={g.key} className={`flex items-center justify-center gap-1.5 text-center leading-tight ${g.key === signal ? 'text-[#e2e2e2]' : ''}`}>
+                  <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: g.color }} />{g.short}
+                </div>
+              ))}
+              <div role="columnheader" className="pl-5">{sigMeta.short} vs overall, in percentage points</div>
+            </div>
+
+            <div role="rowgroup">
+              <div role="row" className="grid grid-cols-[150px_repeat(5,minmax(70px,1fr))_minmax(260px,2.6fr)] items-center gap-x-1.5 px-5 py-1.5 sm:px-6">
+                <div role="cell" className="text-[14px] font-medium">All companies<div className={`${MONO} text-[11px] font-normal text-[#8c909f]`}>{totalCompanies} companies</div></div>
+                {SIGNALS.map(g => (
+                  <div role="cell" key={g.key}>
+                    <HeatCell pct={overall[g.key].pct} count={overall[g.key].count} white active={g.key === signal}
+                      label={`All companies: ${overall[g.key].pct.toFixed(0)}% ${g.explorer}, ${overall[g.key].count} of ${totalCompanies}. Open in Explorer`}
+                      onClick={() => go(undefined, g.explorer)} />
+                  </div>
+                ))}
+                <div role="cell" className="pl-5 text-[13px] text-[#8c909f]">Overall {sigMeta.short.toLowerCase()} share: <span className={`${MONO} text-[#e2e2e2]`}>{overall[signal].pct.toFixed(0)}%</span></div>
+              </div>
+              <div className="mx-5 border-t border-white/[0.08] sm:mx-6" />
+              {signalRows.map(s => <SignalRow key={s.sector} s={s} {...signalCtx} />)}
+            </div>
+            {unknown && (
+              <div role="rowgroup" className="mt-1 border-t border-dashed border-white/[0.14] pt-1">
+                <SignalRow s={unknown} noData {...signalCtx} />
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="px-5 pb-5 pt-3 text-[13px] leading-relaxed text-[#8c909f] sm:px-6">
+          Each cell is the percentage of that sector&apos;s companies with the signal, with the company count beside it. Click a cell to see those companies in the Explorer.
+        </p>
+      </section>
+
+      {/* ── About this data ──────────────────────────────────────────────── */}
+      <aside aria-label="About this data" className="mb-16 rounded-[20px] p-5 sm:p-6" style={GLASS}>
+        <h2 className="text-[17px] font-semibold text-[#c2c6d6]">About this data</h2>
+        <ul className="mt-3 grid list-disc gap-2 pl-5 text-[14px] leading-relaxed text-[#8c909f]">
+          <li>Sector figures are simple averages across companies, so a sector with a few large movers can look different from its typical stock.</li>
+          <li>Small sectors are noisier. {real.length ? `${[...real].sort((a, b) => a.number_of_companies - b.number_of_companies)[0].sector} has only ${[...real].sort((a, b) => a.number_of_companies - b.number_of_companies)[0].number_of_companies} companies.` : ''}</li>
+          <li>Forecasts and signals are model outputs for education. They are not advice, and they are not a promise of future returns.</li>
+        </ul>
+      </aside>
+    </div>
+  )
+}
+
+/** One heatmap cell: a quiet single-hue tint that deepens with share, with the exact numbers printed. */
+function HeatCell({ pct, count, label, onClick, active, white }: { pct: number; count: number; label: string; onClick: () => void; active?: boolean; white?: boolean }) {
+  const alpha = 0.04 + Math.min(pct / 60, 1) * 0.34
+  return (
+    <button type="button" onClick={onClick} aria-label={label}
+      className={`ui-press flex h-9 w-full items-center justify-center gap-1.5 rounded-lg ${MONO} text-[12px] tabular-nums ${FOCUS} ${active ? 'ring-1 ring-inset ring-white/25' : ''}`}
+      style={{ background: white ? `rgba(255,255,255,${(0.03 + Math.min(pct / 60, 1) * 0.18).toFixed(3)})` : `rgba(173,198,255,${alpha.toFixed(3)})`, color: pct < 0.5 ? '#8c909f' : '#e2e2e2' }}>
+      {pct < 0.5 ? '0%' : `${pct.toFixed(0)}%`}
+      <span className="text-[11px]" style={{ color: pct < 0.5 ? '#8c909f' : '#e2e2e2' }}>{count}</span>
+    </button>
+  )
+}
+
+type Go = (sector?: string, signal?: string) => void
+type Spring = { duration: number } | { type: 'spring'; duration: number; bounce: number }
+
+function ScoreRow({ s, noData, go, fPos, springT, maxVol, maxMape, maxMargin }: {
+  s: SectorSummary; noData?: boolean; go: Go; fPos: (v: number) => number; springT: Spring; maxVol: number; maxMape: number; maxMargin: number
+}) {
+  const mid = s.avg_forecast_30d_upside_pct
+  const lo = s.min_forecast_30d_upside_pct, hi = s.max_forecast_30d_upside_pct
+  const color = mid >= 0 ? '#4edea3' : '#F87171'
+  return (
+    <motion.div layout="position" transition={springT} role="row"
+      className={`relative grid grid-cols-[minmax(150px,1.1fr)_minmax(260px,2.4fr)_repeat(3,minmax(88px,1fr))] items-center gap-x-5 px-5 py-2 sm:px-6 ${ROW_HOVER}`}>
+      <div role="cell" className="min-w-0">
+        <button type="button" onClick={() => go(s.sector)} className={`${STRETCH} text-left text-[15px] font-medium leading-5 ${noData ? 'text-[#c2c6d6]' : ''} ${FOCUS} rounded-md`}
+          aria-label={`${noData ? 'Sector not in data' : s.sector}, ${s.number_of_companies} companies. Open in Explorer`}>
+          {noData ? 'Sector not in data' : s.sector}
+        </button>
+        <div className={`${MONO} text-[12px] leading-4 text-[#8c909f]`}>{s.number_of_companies} companies</div>
+      </div>
+      <div role="cell" className="flex items-center gap-3">
+        <div className="relative h-6 flex-1" aria-hidden>
+          <div className="absolute inset-x-0 top-[11px] h-[2px] rounded bg-white/[0.07]" />
+          <div className="absolute inset-y-0.5 w-px bg-white/30" style={{ left: `${fPos(0)}%` }} />
+          {lo != null && hi != null && <div className="absolute top-[9px] h-1.5 rounded-sm bg-[#adc6ff]/30" style={{ left: `${fPos(lo)}%`, width: `${Math.max(0.5, fPos(hi) - fPos(lo))}%` }} />}
+          <div className="absolute top-[7px] size-2.5 rounded-full ring-2 ring-[#1b1d1d]" style={{ left: `calc(${fPos(mid)}% - 5px)`, background: color }} />
+        </div>
+        <div className={`${MONO} w-[58px] shrink-0 text-right text-[13px] tabular-nums`} style={{ color }}>{METRICS[0].fmt(mid)}</div>
+        <span className="sr-only">{lo != null && hi != null ? `Range ${METRICS[0].fmt(lo)} to ${METRICS[0].fmt(hi)}` : ''}</span>
+      </div>
+      <MetricCell value={s.avg_annualized_volatility_pct} text={METRICS[1].fmt(s.avg_annualized_volatility_pct)} max={maxVol} />
+      <MetricCell value={s.avg_model_mape} text={METRICS[2].fmt(s.avg_model_mape)} max={maxMape} />
+      <MetricCell value={s.avg_profit_margin_pct} text={METRICS[3].fmt(s.avg_profit_margin_pct)} max={maxMargin} />
+    </motion.div>
+  )
+}
+
+function MetricCell({ value, text, max }: { value: number; text: string; max: number }) {
+  return (
+    <div role="cell">
+      <div className={`${MONO} text-[13px] tabular-nums`}>{text}</div>
+      <div className="mt-1.5 h-1 rounded-full bg-white/[0.07]" aria-hidden>
+        <div className="h-full rounded-full bg-[#adc6ff]/60" style={{ width: `${Math.max(0, value) / max * 100}%` }} />
       </div>
     </div>
+  )
+}
+
+function SignalRow({ s, noData, go, springT, signal, sigMeta, overallPct, dPos, share, signalTotal }: {
+  s: SectorSummary; noData?: boolean; go: Go; springT: Spring; signal: SignalKey; sigMeta: typeof SIGNALS[number]; overallPct: number
+  dPos: (v: number) => number; share: (s: SectorSummary, key: SignalKey) => number; signalTotal: (s: SectorSummary) => number
+}) {
+  const name = noData ? 'Sector not in data' : s.sector
+  const d = share(s, signal) - overallPct
+  const c = d >= 0 ? '#7fd8b4' : '#8c909f'
+  return (
+    <motion.div layout="position" transition={springT} role="row"
+      className={`relative grid grid-cols-[150px_repeat(5,minmax(70px,1fr))_minmax(260px,2.6fr)] items-center gap-x-1.5 px-5 py-0.5 sm:px-6 ${ROW_HOVER}`}>
+      <div role="cell" className="min-w-0 py-0.5">
+        <button type="button" onClick={() => go(s.sector, sigMeta.explorer)} className={`${STRETCH} block max-w-full truncate text-left text-[14px] leading-5 ${noData ? 'text-[#c2c6d6]' : ''} ${FOCUS} rounded-md`}
+          aria-label={`${name}: ${share(s, signal).toFixed(0)}% ${sigMeta.explorer}. Open in Explorer`}>
+          {name}
+        </button>
+        <div className={`${MONO} text-[11px] leading-4 text-[#8c909f]`}>{s.number_of_companies} companies</div>
+      </div>
+      {SIGNALS.map(g => (
+        <div role="cell" key={g.key} className="relative z-10">
+          <HeatCell pct={share(s, g.key)} count={s[g.key]} active={g.key === signal}
+            label={`${name}: ${share(s, g.key).toFixed(0)}% ${g.explorer}, ${s[g.key]} of ${signalTotal(s)}. Open in Explorer`}
+            onClick={() => go(s.sector, g.explorer)} />
+        </div>
+      ))}
+      <div role="cell" className="flex items-center gap-3 pl-5">
+        <div className="relative h-5 flex-1" aria-hidden>
+          <div className="absolute inset-y-0 w-px bg-white/30" style={{ left: `${dPos(0)}%` }} />
+          <div className="absolute top-[9px] h-[2px]" style={{ left: `${Math.min(dPos(0), dPos(d))}%`, width: `${Math.abs(dPos(d) - dPos(0))}%`, background: c }} />
+          <div className="absolute top-[5px] size-2.5 rounded-full" style={{ left: `calc(${dPos(d)}% - 5px)`, background: c }} />
+        </div>
+        <div className={`${MONO} w-[92px] shrink-0 text-right text-[12px] tabular-nums`}>
+          <span style={{ color: c }}>{signed(d)} pp</span> <span className="text-[#8c909f]">{share(s, signal).toFixed(0)}%</span>
+        </div>
+      </div>
+    </motion.div>
   )
 }

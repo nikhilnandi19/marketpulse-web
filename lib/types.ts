@@ -59,6 +59,9 @@ export interface SectorSummary {
   weak_negative_count: number
   stable_watchlist_count: number
   needs_further_review_count: number
+  /** Lowest and highest 30-day forecast among the sector's companies (absent in sample data). */
+  min_forecast_30d_upside_pct?: number
+  max_forecast_30d_upside_pct?: number
 }
 
 export interface ActualVsPredicted {

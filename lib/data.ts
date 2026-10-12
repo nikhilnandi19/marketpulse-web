@@ -229,6 +229,8 @@ export async function loadSectorSummary(): Promise<SectorSummary[]> {
       weak_negative_count: parseNum(r.weak_negative_count) ?? 0,
       stable_watchlist_count: parseNum(r.stable_watchlist_count) ?? 0,
       needs_further_review_count: parseNum(r.needs_further_review_count) ?? 0,
+      min_forecast_30d_upside_pct: parseNum(r.min_forecast_30d_upside_pct) ?? undefined,
+      max_forecast_30d_upside_pct: parseNum(r.max_forecast_30d_upside_pct) ?? undefined,
     })
   )
   return data.length > 0 ? data : getSampleSectorSummary()
