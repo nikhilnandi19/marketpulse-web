@@ -64,6 +64,7 @@ export default function SectorComparison({ sectors, onNavigateToExplorer }: Prop
   const real = useMemo(() => sectors.filter(s => s.sector !== UNKNOWN), [sectors])
   const unknown = useMemo(() => sectors.find(s => s.sector === UNKNOWN), [sectors])
   const totalCompanies = sum(sectors.map(s => s.number_of_companies))
+  const rankedCompanies = sum(real.map(s => s.number_of_companies))
   const signalTotal = (s: SectorSummary) => sum(SIGNALS.map(g => s[g.key]))
   const share = (s: SectorSummary, key: SignalKey) => { const t = signalTotal(s); return t ? (s[key] / t) * 100 : 0 }
 
@@ -136,14 +137,14 @@ export default function SectorComparison({ sectors, onNavigateToExplorer }: Prop
           </p>
         </div>
         <aside aria-label="Coverage" className={`${RISE} self-start p-6 [animation-delay:200ms] sm:p-7 lg:col-span-5 lg:mt-10`} style={GLASS}>
-          <div className="text-[17px] font-medium text-[#c2c6d6]">Sectors compared</div>
-          <div className="mt-3 flex items-baseline gap-3 text-[clamp(2.75rem,6vw,4rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums">
-            <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text text-transparent">{real.length}</span>
-            <span className="text-[0.5em] font-normal text-[#8c909f]">{totalCompanies} companies</span>
+          <div className="text-[17px] font-medium text-[#c2c6d6]">Companies in the rankings</div>
+          <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="bg-[linear-gradient(135deg,#d0bcff_0%,#4edea3_100%)] bg-clip-text text-[clamp(2.75rem,6vw,4rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums text-transparent">{rankedCompanies}</span>
+            <span className="text-[18px] tracking-normal text-[#8c909f]">across {real.length} sectors</span>
           </div>
           {unknown && (
             <p className="mt-5 border-t border-white/[0.08] pt-4 text-[15px] leading-relaxed text-[#8c909f]">
-              {unknown.number_of_companies} companies have no sector in the data. They sit in their own group, shown apart and left out of the rankings.
+              {unknown.number_of_companies} more companies have no sector in the data. They are shown apart below and left out of the rankings.
             </p>
           )}
         </aside>
