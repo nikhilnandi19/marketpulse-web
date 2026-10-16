@@ -1,2 +1,2 @@
 companies_analyzed,avg_forecast_30d_upside_pct,avg_model_mape,avg_annualized_volatility_pct,avg_profit_margin_pct,positive_forecast_count,neutral_forecast_count,negative_forecast_count,potential_opportunities,stable_watchlist,needs_further_review,weak_negative,high_volatility_speculative,latest_market_date,forecast_horizon_days,backtest_window_days,future_forecast_rows,backtest_rows,dynamic_weight_rows
-515,2.693552656943676,1.6038600952525564,34.43924779436668,14.019182380959865,282,135,98,163,135,165,46,6,2026-10-14,30,90,15450,46350,3090
+515,3.6730767003102187,1.6084387723287963,34.549607202861196,14.019182380959865,322,121,72,193,121,161,35,5,2026-10-15,30,90,15450,46350,3090
