@@ -1,11 +1,11 @@
 {
-  "exported_at": "2026-10-20T01:11:27+00:00",
+  "exported_at": "2026-10-21T00:46:50+00:00",
   "source": "Yahoo Finance via yfinance, auto_adjust=True (split- and dividend-adjusted close)",
   "methodology_version": "1.0.0",
   "benchmark": "SPY",
   "first_date": "2017-12-01",
-  "last_date": "2026-10-16",
-  "calendar_days": 2230,
+  "last_date": "2026-10-19",
+  "calendar_days": 2231,
   "symbols_written": 515,
   "symbols_skipped": {},
   "symbols_with_suspect_jumps": [
